@@ -52,13 +52,13 @@ def main():
             _, predictions_argmax = torch.max(predictions, 1)
             predictions_points = predictions_argmax.cpu().numpy()
             eval_metric.update(predictions_points, labels)
-            predictions_points = predictions_points.astype(np.uint32)
             # predictions_points = np.vectorize(map_inv.get)(predictions_points).astype(
             #     np.uint32
             # )
+            predictions_points = prediction_points.astype(np.uint32)
             seq, sweep = items["seq"][0], items["sweep"][0]
             out_file = (
-                args.output_pathg
+                args.output_path
                 / "sequences"
                 / f"{seq}"
                 / "predictions"
