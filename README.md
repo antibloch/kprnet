@@ -21,6 +21,14 @@ python train_kitti.py \
   --checkpoint-dir your_output_dir
 ```
 
+```bash
+python run_inference.py --semantic-kitti-dir kitti_dataset/dataset/sequences --output-path stuff  --checkpoint-path pretrained_total_model/kpr_trained.pth
+```
+
+```bash
+python view_inference_v2.py --points ds/points --labels ds/labels --predictions ds/predictions --results results
+```
+
 The fully trained model weights can be downloaded [here](https://drive.google.com/file/d/11mUMdFPNT-05lC54Ru_2OwdwqTPV4jrW/view?usp=sharing) .
 
 ## Acknowledgments
