@@ -22,11 +22,11 @@ python train_kitti.py \
 ```
 
 ```bash
-python run_inference.py --semantic-kitti-dir kitti_dataset/dataset/sequences --output-path stuff  --checkpoint-path pretrained_total_model/kpr_trained.pth
+python run_inference.py --semantic-kitti-dir kitti_dataset/dataset/sequences --output-path pred_stuff  --checkpoint-path pretrained_total_model/kpr_trained.pth
 ```
 
 ```bash
-python view_inference_v2.py --points ds/points --labels ds/labels --predictions ds/predictions --results results
+python view_inference_v2.py --points kitti_dataset/dataset/sequences/08/velodyne --labels kitti_dataset/dataset/sequences/08/labels --predictions pred_stuff/sequences/08/predictions --results results
 ```
 
 The fully trained model weights can be downloaded [here](https://drive.google.com/file/d/11mUMdFPNT-05lC54Ru_2OwdwqTPV4jrW/view?usp=sharing) .
