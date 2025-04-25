@@ -275,54 +275,50 @@ def main():
 
 
     for id, point_file, label_file, pred_file in zip(range(len(point_fil_names)), point_fil_names, label_file_names, pred_file_names):
-        point_file_path = os.path.join(args.points, point_file)
-        label_file_path = os.path.join(args.labels, label_file)
-        pred_file_path = os.path.join(args.predictions, pred_file)
+        if id<100:
+            point_file_path = os.path.join(args.points, point_file)
+            label_file_path = os.path.join(args.labels, label_file)
+            pred_file_path = os.path.join(args.predictions, pred_file)
 
-        data = np.fromfile(point_file_path, dtype=np.float32)
-        data = data.reshape(-1, 4)
-        data = data[:, :3]  # Use only the XYZ coordinates
+            data = np.fromfile(point_file_path, dtype=np.float32)
+            data = data.reshape(-1, 4)
+            data = data[:, :3]  # Use only the XYZ coordinates
 
-        labels = np.fromfile(label_file_path, dtype=np.uint32)& 0xFFFF
-        labels = np.vectorize(learning_map.get)(labels)
+            labels = np.fromfile(label_file_path, dtype=np.uint32)& 0xFFFF
+            labels = np.vectorize(learning_map.get)(labels)
 
-        predictions = np.fromfile(pred_file_path, dtype=np.uint32)
-  
-        predictions= predictions[labels < 255]
-        points = data[labels < 255]
-        labels= labels[labels < 255]
-
-
-        
-
-        pred_colors = np.zeros((len(predictions), 3), dtype=np.float32)
-        for label in range(num_classes):
-            pred_colors[predictions == label] = colors[label]
+            predictions = np.fromfile(pred_file_path, dtype=np.uint32)
+    
+            predictions= predictions[labels < 255]
+            points = data[labels < 255]
+            labels= labels[labels < 255]
 
 
-        labels_colors = np.zeros((len(labels), 3), dtype=np.float32)
-        for label in range(num_classes):
-            labels_colors[labels == label] = colors[label]
+            pred_colors = np.zeros((len(predictions), 3), dtype=np.float32)
+            for label in range(num_classes):
+                pred_colors[predictions == label] = colors[label]
 
 
-        legend_patches = []
-        for i, class_name in enumerate(class_names):
-            rgb_color = colors[i]
-            patch = mpatches.Patch(color=rgb_color, label=class_name)   
-            legend_patches.append(patch)
+            labels_colors = np.zeros((len(labels), 3), dtype=np.float32)
+            for label in range(num_classes):
+                labels_colors[labels == label] = colors[label]
 
 
-        view_frame(points,  pred_colors, labels_colors, legend_patches, args.results, id)
+            legend_patches = []
+            for i, class_name in enumerate(class_names):
+                rgb_color = colors[i]
+                patch = mpatches.Patch(color=rgb_color, label=class_name)   
+                legend_patches.append(patch)
+
+
+            view_frame(points,  pred_colors, labels_colors, legend_patches, args.results, id)
 
     # Create a video from the saved frames
-    create_video_from_frames(args.results, os.path.join(args.results, "output_video.mp4"), fps=1)
+    create_video_from_frames(args.results, os.path.join(args.results, "output_video.mp4"), fps=2)
 
 
 
 
-
-
-        
 
 
 if __name__ == "__main__":
