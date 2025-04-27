@@ -19,6 +19,10 @@ python train_kitti.py \
   --semantic-kitti-dir path_to_semantic_kitti \
   --model-dir location_where_your_pretrained_model_is \
   --checkpoint-dir your_output_dir
+
+
+# e.g: python train_kitti.py --semantic-kitti-dir kitti_dataset --model-dir pretrained_model  --checkpoint-dir output_kitti
+# where kitti_dataset contains dataset/sequences/00..
 ```
 
 ```bash
