@@ -31,6 +31,11 @@ python view_inference_v2.py --points kitti_dataset/dataset/sequences/08/velodyne
 
 The fully trained model weights can be downloaded [here](https://drive.google.com/file/d/11mUMdFPNT-05lC54Ru_2OwdwqTPV4jrW/view?usp=sharing) .
 
+
+![output_video-ezgif com-cut](https://github.com/user-attachments/assets/d80eb03a-e5b7-4a3f-b142-c3aaabe7c699)
+
+
+
 ## Acknowledgments
 [KPConv](https://github.com/HuguesTHOMAS/KPConv-PyTorch) 
 
