@@ -155,6 +155,7 @@ def transform_points(pts, p, max_zoom):
 
 def main(args):
         auxil_transform = False
+        view_img = True
         model = deeplab.resnext101_aspp_kp(19)
         model.to(device)
         model.load_state_dict(torch.load(args.checkpoint_path))
@@ -188,6 +189,19 @@ def main(args):
 
 
                 (depth_image, refl_image, py, px) = do_range_projection(points_xyz, points_refl)
+
+                if view_img:
+                    # Visualize the range image
+                    depth_image = cv2.resize(depth_image, (2049, 65), interpolation=cv2.INTER_LINEAR)
+                    refl_image = cv2.resize(refl_image, (2049, 65), interpolation=cv2.INTER_LINEAR)
+
+                    depth_image = np.clip(depth_image * 255, 0, 255).astype(np.uint8)
+                    refl_image = np.clip(refl_image * 255, 0, 255).astype(np.uint8)
+
+                    cv2.imshow("Depth Image", depth_image)
+                    cv2.imshow("Reflectivity Image", refl_image)
+                    cv2.waitKey(0)
+                    cv2.destroyAllWindows()
 
                 depth_image, refl_image, labels, py, px = _transorm_test(
                     depth_image, refl_image, labels, py, px
