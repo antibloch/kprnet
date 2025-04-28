@@ -171,12 +171,12 @@ def main(args):
                 labels = labels[np.newaxis, :]
 
                 items = {
-                    "image": torch.tensor(image),
-                    "labels": torch.tensor(labels),
-                    "px": torch.tensor(px),
-                    "py": torch.tensor(py),
-                    "points_xyz": torch.tensor(points_xyz),
-                    "knns": torch.tensor(knns),
+                    "image": torch.from_numpy(image),
+                    "labels": torch.from_numpy(labels),
+                    "px": torch.from_numpy(px),
+                    "py": torch.from_numpy(py),
+                    "points_xyz": torch.from_numpy(points_xyz),
+                    "knns": torch.from_numpy(knns),
                 }
 
                 images = items["image"].to(device)
