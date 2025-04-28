@@ -25,7 +25,6 @@ import shutil
 
 parser = argparse.ArgumentParser("Run lidar bug inference")     
 parser.add_argument("--points", required=True, type=Path)
-parser.add_argument("--labels", required=True, type=Path)
 parser.add_argument("--predictions", required=True, type=Path)
 parser.add_argument("--results", required=True, type=Path)
 
