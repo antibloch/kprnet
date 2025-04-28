@@ -140,6 +140,7 @@ def main(args):
                 correct_point_path = os.path.join(args.point_folder, point_path)
 
                 points = np.load(correct_point_path)
+                points = points.astype(np.float32)
                 points_xyz = points[:, :3]
 
                 labels = np.zeros((points.shape[0],))
