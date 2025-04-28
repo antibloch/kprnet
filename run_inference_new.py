@@ -112,6 +112,7 @@ def do_range_projection(
     proj_x = proj_x[order]
 
     proj_range = np.zeros((H, W))
+    depth[depth == 0] = 1e-6
     proj_range[proj_y, proj_x] = 1.0 / depth
 
     proj_reflectivity = np.zeros((H, W))
@@ -148,6 +149,8 @@ def main(args):
                 points_refl = points[:, 3]
                 (depth_image, refl_image, py, px) = do_range_projection(points_xyz, points_refl)
 
+                depth[depth == 0] = 1e-6
+
 
                 depth_image, refl_image, labels, py, px = _transorm_test(
                     depth_image, refl_image, labels, py, px
@@ -170,13 +173,21 @@ def main(args):
                 py = py[np.newaxis, :]
                 labels = labels[np.newaxis, :]
 
+                images = torch.from_numpy(image).unsqueeze(0).to(device)   # (1, 2, H, W)
+                px     = torch.from_numpy(px).unsqueeze(0).float().to(device)
+                py     = torch.from_numpy(py).unsqueeze(0).float().to(device)
+                labels = torch.from_numpy(labels).unsqueeze(0)
+                pxyz   = torch.from_numpy(points_xyz).unsqueeze(0).float().to(device)
+                knns   = torch.from_numpy(knns).unsqueeze(0).long().to(device)
+
+
                 items = {
-                    "image": torch.from_numpy(image),
-                    "labels": torch.from_numpy(labels),
-                    "px": torch.from_numpy(px),
-                    "py": torch.from_numpy(py),
-                    "points_xyz": torch.from_numpy(points_xyz),
-                    "knns": torch.from_numpy(knns),
+                    "image": images,
+                    "labels": labels,
+                    "py": py,
+                    "px": px,
+                    "points_xyz": pxyz,
+                    "knns": knns,
                 }
 
                 images = items["image"].to(device)
@@ -185,6 +196,8 @@ def main(args):
                 px = items["px"].float().to(device)
                 pxyz = items["points_xyz"].float().to(device)
                 knns = items["knns"].long().to(device)
+
+                
                 predictions = model(images, px, py, pxyz, knns)
                 _, predictions_argmax = torch.max(predictions, 1)
                 predictions_points = predictions_argmax.cpu().numpy()
