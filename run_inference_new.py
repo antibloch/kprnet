@@ -123,8 +123,38 @@ def do_range_projection(
 
 
 
+
+def transform_points(pts, p, max_zoom):
+    center = np.mean(pts, axis=0)
+
+    # Calculate the rotation angle for this frame
+    angle = p * 360.0
+    
+    # Create a rotation matrix around the y-axis
+    rotation_matrix = np.array([
+        [np.cos(np.radians(angle)), 0, np.sin(np.radians(angle))],
+        [0, 1, 0],
+        [-np.sin(np.radians(angle)), 0, np.cos(np.radians(angle))]
+    ])
+    
+        # Apply a constant zoom factor to all frames
+    current_zoom = max_zoom
+    
+    # Apply rotation to the points relative to the center
+    centered_points = pts - center
+    
+    # Apply zoom by scaling the points (zoom in = points appear larger)
+    zoomed_points = centered_points * current_zoom
+    
+    # Apply rotation and shift back
+    pts = np.dot(zoomed_points, rotation_matrix.T) + center
+    return pts
+
+
+
+
 def main(args):
-        auxil_transform = True
+        auxil_transform = False
         model = deeplab.resnext101_aspp_kp(19)
         model.to(device)
         model.load_state_dict(torch.load(args.checkpoint_path))
@@ -151,33 +181,8 @@ def main(args):
                 if auxil_transform:
                     # ==================Auxillary transformation==================
 
-                    center = np.mean(points_xyz , axis=0)
-                    p = 1/4
-                    max_zoom = 1.0
-
-                    # Calculate the rotation angle for this frame
-                    angle = p * 360.0
-                    
-                    # Create a rotation matrix around the y-axis
-                    rotation_matrix = np.array([
-                        [np.cos(np.radians(angle)), 0, np.sin(np.radians(angle))],
-                        [0, 1, 0],
-                        [-np.sin(np.radians(angle)), 0, np.cos(np.radians(angle))]
-                    ])
-                    
-                        # Apply a constant zoom factor to all frames
-                    current_zoom = max_zoom
-                    
-                    # Apply rotation to the points relative to the center
-                    centered_points = points_xyz - center
-                    
-                    # Apply zoom by scaling the points (zoom in = points appear larger)
-                    zoomed_points = centered_points * current_zoom
-                    
-                    # Apply rotation and shift back
-                    points_xyz = np.dot(zoomed_points, rotation_matrix.T) + center
-
-
+                    points_xyz = transform_points(points_xyz, 1/4, 1.0)
+                    points_xyz  = transform_points(points_xyz , 1/2, 1.0)
                     # ==================Auxillary transformation==================
 
 
