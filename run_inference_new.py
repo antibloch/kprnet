@@ -178,10 +178,12 @@ def main(args):
                 labels = np.zeros((points.shape[0],))
 
                 points_refl = points[:, 3]
-
+                
+                
+                # addendum
+                points_xyz = points_xyz[:, [2,0,1]]
                 if auxil_transform:
                     # ==================Auxillary transformation==================
-
                     points_xyz = transform_points(points_xyz, 1/4, 1.0)
                     points_xyz  = transform_points(points_xyz , 1/2, 1.0)
                     # ==================Auxillary transformation==================
