@@ -269,11 +269,13 @@ def main():
             point_file_path = os.path.join(args.points, point_file)
             pred_file_path = os.path.join(args.predictions, pred_file)
 
-            data = np.fromfile(point_file_path, dtype=np.float32)
+            data = np.load(point_file_path)
+            data = data.astype(np.float32)
             data = data[:, :3]  # Use only the XYZ coordinates
 
 
-            predictions = np.fromfile(pred_file_path, dtype=np.uint32)
+            predictions = np.load(pred_file_path)
+            predictions = predictions.astype(np.uint32)
     
             predictions= predictions[labels < 255]
             points = data[labels < 255]

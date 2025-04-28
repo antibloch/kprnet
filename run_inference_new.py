@@ -136,10 +136,10 @@ def main(args):
 
         with torch.no_grad():
             for point_path in all_point_paths:
-                point_name = point_path.split("/")[-1]
+                point_name = point_path.split(".")[0]
                 correct_point_path = os.path.join(args.point_folder, point_path)
 
-                points = np.fromfile(correct_point_path, dtype=np.float32)
+                points = np.load(correct_point_path)
                 points_xyz = points[:, :3]
 
                 labels = np.zeros((points.shape[0],))
