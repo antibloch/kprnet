@@ -277,9 +277,7 @@ def main():
             predictions = np.load(pred_file_path)
             predictions = predictions.astype(np.uint32)
     
-            predictions= predictions[labels < 255]
-            points = data[labels < 255]
-            labels= labels[labels < 255]
+            points = data
 
 
             pred_colors = np.zeros((len(predictions), 3), dtype=np.float32)
