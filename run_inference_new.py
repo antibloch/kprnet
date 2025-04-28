@@ -64,8 +64,6 @@ def _transorm_train(depth, refl, labels, py, px, points_xyz):
 
 
 
-
-
 def _transorm_test(depth, refl, labels, py, px):
     depth = cv2.resize(depth, (4097, 289), interpolation=cv2.INTER_LINEAR)
     refl = cv2.resize(refl, (4097, 289), interpolation=cv2.INTER_LINEAR)
@@ -125,13 +123,16 @@ def do_range_projection(
 
 
 def main(args):
-
         model = deeplab.resnext101_aspp_kp(19)
         model.to(device)
         model.load_state_dict(torch.load(args.checkpoint_path))
         print("Runnign validation")
         model.eval()
         all_point_paths = os.listdir(args.point_folder)
+
+        if os.path.exists(args.output_path):
+            os.system(f"rm -rf {args.output_path}")
+        os.makedirs(args.output_path, exist_ok=True)
 
         with torch.no_grad():
             for point_path in all_point_paths:
