@@ -149,9 +149,6 @@ def main(args):
                 points_refl = points[:, 3]
                 (depth_image, refl_image, py, px) = do_range_projection(points_xyz, points_refl)
 
-                depth[depth == 0] = 1e-6
-
-
                 depth_image, refl_image, labels, py, px = _transorm_test(
                     depth_image, refl_image, labels, py, px
                 )
