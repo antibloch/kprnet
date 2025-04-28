@@ -55,7 +55,7 @@ def main():
             # predictions_points = np.vectorize(map_inv.get)(predictions_points).astype(
             #     np.uint32
             # )
-            predictions_points = prediction_points.astype(np.uint32)
+            predictions_points = predictions_points.astype(np.uint32)
             seq, sweep = items["seq"][0], items["sweep"][0]
             out_file = (
                 args.output_path
