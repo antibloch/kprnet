@@ -275,7 +275,7 @@ def main():
 
 
             predictions = np.load(pred_file_path)
-            predictions = predictions.astype(np.uint32)
+            predictions = predictions.astype(np.uint32).flatten()
     
             points = data
 

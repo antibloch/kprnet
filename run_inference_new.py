@@ -124,6 +124,7 @@ def do_range_projection(
 
 
 def main(args):
+        auxil_transform = True
         model = deeplab.resnext101_aspp_kp(19)
         model.to(device)
         model.load_state_dict(torch.load(args.checkpoint_path))
@@ -143,10 +144,44 @@ def main(args):
                 points = np.load(correct_point_path)
                 points = points.astype(np.float32)
                 points_xyz = points[:, :3]
-
                 labels = np.zeros((points.shape[0],))
 
                 points_refl = points[:, 3]
+
+                if auxil_transform:
+                    # ==================Auxillary transformation==================
+
+                    center = np.mean(points_xyz , axis=0)
+                    p = 1/4
+                    max_zoom = 1.0
+
+                    # Calculate the rotation angle for this frame
+                    angle = p * 360.0
+                    
+                    # Create a rotation matrix around the y-axis
+                    rotation_matrix = np.array([
+                        [np.cos(np.radians(angle)), 0, np.sin(np.radians(angle))],
+                        [0, 1, 0],
+                        [-np.sin(np.radians(angle)), 0, np.cos(np.radians(angle))]
+                    ])
+                    
+                        # Apply a constant zoom factor to all frames
+                    current_zoom = max_zoom
+                    
+                    # Apply rotation to the points relative to the center
+                    centered_points = points_xyz - center
+                    
+                    # Apply zoom by scaling the points (zoom in = points appear larger)
+                    zoomed_points = centered_points * current_zoom
+                    
+                    # Apply rotation and shift back
+                    points_xyz = np.dot(zoomed_points, rotation_matrix.T) + center
+
+
+                    # ==================Auxillary transformation==================
+
+
+
                 (depth_image, refl_image, py, px) = do_range_projection(points_xyz, points_refl)
 
                 depth_image, refl_image, labels, py, px = _transorm_test(
