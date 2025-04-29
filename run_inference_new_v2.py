@@ -76,7 +76,57 @@ def _transorm_test(depth, refl, labels, py, px):
 
 
 
-def do_range_projection(points, reflectivity,
+def do_range_projection_v3(points, reflectivity,
+                        cols: int = 2048, channels: int = 64):
+    """
+    points:  (N,3)
+    reflectivity: (N,)
+    cols:  horizontal samples per revolution (512/1024/2048)
+    channels: vertical scan lines (OS-1-128 ⇒ 128)
+    """
+
+
+    depth = np.linalg.norm(points, axis=1)
+    yaw   = -np.arctan2(points[:,1], -points[:,0])
+
+    yaw_norm = (yaw - yaw.min())/(yaw.max() - yaw.min())
+
+    proj_x = (yaw_norm * cols- 1e-3).astype(np.int32)
+
+    new_raw = np.nonzero((yaw_norm[1:] < 0.2) & (yaw_norm[:-1] > 0.8))[0] + 1
+
+    proj_y = np.cumsum(new_raw)
+
+
+    if proj_y.max() >= channels:
+        proj_y = np.clip(proj_y, 0, channels - 1)
+        H = channels
+    else:
+        H = int(proj_y.max()) + 1
+
+    W = int(np.ceil(proj_x.max())) + 1
+
+
+
+    order = np.argsort(depth)[::-1]                 # z-buffer
+    depth, reflectivity, proj_x, proj_y = [a[order] for a in
+                                           (depth, reflectivity, proj_x, proj_y)]
+
+    proj_range        = np.zeros((H, W), dtype=np.float32)
+    proj_reflectivity = np.zeros_like(proj_range)
+    proj_range[proj_y, proj_x]        = 1.0 / np.maximum(depth, 1e-6)
+    proj_reflectivity[proj_y, proj_x] = reflectivity
+
+    # floating-point indices (needed later):
+    px = proj_x.astype(np.float32)
+    py = proj_y.astype(np.float32)
+
+    return proj_range, proj_reflectivity, py, px, H, W
+
+
+
+
+def do_range_projection_v2(points, reflectivity,
                         cols: int = 2048, channels: int = 64):
     """
     points:  (N,3)
@@ -120,7 +170,7 @@ def do_range_projection(points, reflectivity,
 
 
 
-def do_range_projection(
+def do_range_projection_v1(
     points: np.ndarray, reflectivity: np.ndarray, W: int = 2048, H: int = 64
 ):
     
@@ -305,8 +355,9 @@ def main(args):
 
                 W = 2048
                 H = 64
-                # (depth_image, refl_image, py, px) = do_range_projection(points_xyz, points_refl)
-                (depth_image, refl_image, py, px, H, W) = do_range_projection(points_xyz, points_refl, W, H)
+                # (depth_image, refl_image, py, px) = do_range_projection_v1(points_xyz, points_refl)
+                # (depth_image, refl_image, py, px, H, W) = do_range_projection_v2(points_xyz, points_refl, W, H)
+                (depth_image, refl_image, py, px, H, W) = do_range_projection_v3(points_xyz, points_refl, W, H)
 
                 if view_img:
                     # Visualize the range image
