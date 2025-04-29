@@ -17,7 +17,7 @@ from models import deeplab
 import cv2
 import os
 import open3d as o3d
-
+import matplotlib.pyplot as plt
 
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -97,6 +97,12 @@ def do_range_projection(
     proj_y = np.cumsum(proj_y)
     # scale to image size using angular resolution
     proj_x = proj_x * W - 0.001
+
+    proj_x = np.clip(proj_x, 0, W-1)
+    proj_y = np.clip(proj_y, 0, H-1)
+
+    # H = int(proj_y.max())+1
+    # print(f"Height: {H}")
 
     px = proj_x.copy()
     py = proj_y.copy()
@@ -204,7 +210,7 @@ def reground(pts, dist_threshold=0.1, ransac_n = 3):
 
     # (Optional) Translate to put ground at z=0
     ground_points = np.asarray(pcd.points)[inliers]
-    ground_z_mean = ground_points[:, 2].mean()
+    ground_z_mean = ground_points[:, 2].mean()/2
     pcd.translate((0, 0, -ground_z_mean))
 
     final_points = np.asarray(pcd.points).astype(np.float32)
@@ -261,10 +267,21 @@ def main(args):
                     depth_image = np.clip(depth_image * 255, 0, 255).astype(np.uint8)
                     refl_image = np.clip(refl_image * 255, 0, 255).astype(np.uint8)
 
-                    cv2.imshow("Depth Image", depth_image)
-                    cv2.imshow("Reflectivity Image", refl_image)
-                    cv2.waitKey(0)
-                    cv2.destroyAllWindows()
+
+                    depth_image = cv2.resize(depth_image, (224,224), interpolation=cv2.INTER_LINEAR)
+                    refl_image = cv2.resize(refl_image, (224,224), interpolation=cv2.INTER_LINEAR)
+
+                    plt.imshow(depth_image, cmap='gray')
+                    plt.title('Depth Image')
+                    plt.axis('off')
+                    plt.show()
+
+                    plt.imshow(refl_image, cmap='gray')
+                    plt.title('Reflectivity Image')
+                    plt.axis('off')
+                    plt.show()
+
+
 
                 depth_image, refl_image, labels, py, px = _transorm_test(
                     depth_image, refl_image, labels, py, px

@@ -17,7 +17,7 @@ from models import deeplab
 import cv2
 import os
 import open3d as o3d
-
+import matplotlib.pyplot as plt
 
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -98,11 +98,11 @@ def do_range_projection(
     # scale to image size using angular resolution
     proj_x = proj_x * W - 0.001
 
-    proj_x = np.clip(proj_x, 0, W-1)
-    proj_y = np.clip(proj_y, 0, H-1)
+    # proj_x = np.clip(proj_x, 0, W-1)
+    # proj_y = np.clip(proj_y, 0, H-1)
 
-    # H = int(proj_y.max())+1
-    # print(f"Height: {H}")
+    H = int(proj_y.max())+1
+    print(f"Height: {H}")
 
     px = proj_x.copy()
     py = proj_y.copy()
@@ -174,42 +174,42 @@ def reground(pts, dist_threshold=0.1, ransac_n = 3):
     axis = np.cross(normal, target)
     axis_norm = np.linalg.norm(axis)
 
-    # if axis_norm < 1e-6:
-    #     R = np.eye(3)
-    # else:
-    #     axis = axis / axis_norm
-    #     angle = np.arccos(np.clip(np.dot(normal, target), -1.0, 1.0))
-    #     K = np.array([
-    #         [0, -axis[2], axis[1]],
-    #         [axis[2], 0, -axis[0]],
-    #         [-axis[1], axis[0], 0]
-    #     ])
-    #     R = np.eye(3) + np.sin(angle) * K + (1 - np.cos(angle)) * (K @ K)
+    if axis_norm < 1e-6:
+        R = np.eye(3)
+    else:
+        axis = axis / axis_norm
+        angle = np.arccos(np.clip(np.dot(normal, target), -1.0, 1.0))
+        K = np.array([
+            [0, -axis[2], axis[1]],
+            [axis[2], 0, -axis[0]],
+            [-axis[1], axis[0], 0]
+        ])
+        R = np.eye(3) + np.sin(angle) * K + (1 - np.cos(angle)) * (K @ K)
 
-    # pcd.rotate(R, center=(0, 0, 0))
+    pcd.rotate(R, center=(0, 0, 0))
 
-    # # Now ground is flat; align x and y
-    # ground_points = np.asarray(pcd.points)[inliers]
-    # xy_points = ground_points[:, :2]
+    # Now ground is flat; align x and y
+    ground_points = np.asarray(pcd.points)[inliers]
+    xy_points = ground_points[:, :2]
 
-    # xy_mean = xy_points.mean(axis=0)
-    # xy_centered = xy_points - xy_mean
+    xy_mean = xy_points.mean(axis=0)
+    xy_centered = xy_points - xy_mean
 
-    # cov = np.cov(xy_centered, rowvar=False)
-    # eigenvalues, eigenvectors = np.linalg.eigh(cov)
-    # sort_idx = np.argsort(eigenvalues)[::-1]
-    # eigenvectors = eigenvectors[:, sort_idx]
+    cov = np.cov(xy_centered, rowvar=False)
+    eigenvalues, eigenvectors = np.linalg.eigh(cov)
+    sort_idx = np.argsort(eigenvalues)[::-1]
+    eigenvectors = eigenvectors[:, sort_idx]
 
-    # x_axis = np.array([eigenvectors[0,0], eigenvectors[1,0], 0])
-    # y_axis = np.array([eigenvectors[0,1], eigenvectors[1,1], 0])
-    # z_axis = np.array([0, 0, 1])
+    x_axis = np.array([eigenvectors[0,0], eigenvectors[1,0], 0])
+    y_axis = np.array([eigenvectors[0,1], eigenvectors[1,1], 0])
+    z_axis = np.array([0, 0, 1])
 
-    # R_align = np.stack([x_axis, y_axis, z_axis], axis=1)
-    # pcd.rotate(R_align.T, center=(0,0,0))
+    R_align = np.stack([x_axis, y_axis, z_axis], axis=1)
+    pcd.rotate(R_align.T, center=(0,0,0))
 
     # (Optional) Translate to put ground at z=0
     ground_points = np.asarray(pcd.points)[inliers]
-    ground_z_mean = ground_points[:, 2].mean()
+    ground_z_mean = ground_points[:, 2].mean()/2
     pcd.translate((0, 0, -ground_z_mean))
 
     final_points = np.asarray(pcd.points).astype(np.float32)
@@ -232,7 +232,7 @@ def main():
         print(f"Min x: {points_xyz[:, 0].min()}, Max x: {points_xyz[:, 0].max()}")
         print(f"Min y: {points_xyz[:, 1].min()}, Max y: {points_xyz[:, 1].max()}")
         print(f"Min z: {points_xyz[:, 2].min()}, Max z: {points_xyz[:, 2].max()}")
-        points_xyz = reground(points_xyz, 0.1, 3)
+        # points_xyz = reground(points_xyz, 0.1, 3)
         print('------------------------------')
         print(f"Min x: {points_xyz[:, 0].min()}, Max x: {points_xyz[:, 0].max()}")
         print(f"Min y: {points_xyz[:, 1].min()}, Max y: {points_xyz[:, 1].max()}")
@@ -256,10 +256,20 @@ def main():
             depth_image = np.clip(depth_image * 255, 0, 255).astype(np.uint8)
             refl_image = np.clip(refl_image * 255, 0, 255).astype(np.uint8)
 
-            cv2.imshow("Depth Image", depth_image)
-            cv2.imshow("Reflectivity Image", refl_image)
-            cv2.waitKey(0)
-            cv2.destroyAllWindows()
+
+            depth_image = cv2.resize(depth_image, (224,224), interpolation=cv2.INTER_LINEAR)
+            refl_image = cv2.resize(refl_image, (224,224), interpolation=cv2.INTER_LINEAR)
+
+            plt.imshow(depth_image, cmap='gray')
+            plt.title('Depth Image')
+            plt.axis('off')
+            plt.show()
+
+            plt.imshow(refl_image, cmap='gray')
+            plt.title('Reflectivity Image')
+            plt.axis('off')
+            plt.show()
+
 
 
 

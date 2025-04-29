@@ -82,9 +82,8 @@ pcd.rotate(R_align.T, center=(0,0,0))
 
 # (Optional) Translate to put ground at z=0
 ground_points = np.asarray(pcd.points)[inliers]
-ground_z_mean = ground_points[:, 2].mean()
+ground_z_mean = ground_points[:, 2].mean()/2
 pcd.translate((0, 0, -ground_z_mean))
-
 
 
 o3d.io.write_point_cloud("aligned.ply", pcd)
