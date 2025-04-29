@@ -76,9 +76,56 @@ def _transorm_test(depth, refl, labels, py, px):
 
 
 
+def do_range_projection(points, reflectivity,
+                        cols: int = 2048, channels: int = 64):
+    """
+    points:  (N,3)
+    reflectivity: (N,)
+    cols:  horizontal samples per revolution (512/1024/2048)
+    channels: vertical scan lines (OS-1-128 ⇒ 128)
+    """
+
+    W = cols + 1            # add 1 so that last bin never wraps
+    H = channels + 1        # +1 sentinel row, exactly like the HDL-64E code
+
+    depth = np.linalg.norm(points, axis=1)
+    yaw   = -np.arctan2(points[:,1], -points[:,0])
+    proj_x_norm = (yaw / np.pi + 1.0) * 0.5         # [0,1]
+
+    # --------------- scan-line–based row index ---------------
+    wrap = (proj_x_norm[1:] < 0.2) & (proj_x_norm[:-1] > 0.8)
+    proj_y = np.concatenate(([0], np.cumsum(wrap))).astype(np.int32)
+    
+    # ---------------------------------------------------------
+
+    proj_x = (proj_x_norm * W - 1e-3).astype(np.int32)
+    H = proj_y.max() + 1
+    proj_y = np.minimum(proj_y, H - 1)              # safety clip
+
+    order = np.argsort(depth)[::-1]                 # z-buffer
+    depth, reflectivity, proj_x, proj_y = [a[order] for a in
+                                           (depth, reflectivity, proj_x, proj_y)]
+
+    proj_range        = np.zeros((H, W), dtype=np.float32)
+    proj_reflectivity = np.zeros_like(proj_range)
+    proj_range[proj_y, proj_x]        = 1.0 / np.maximum(depth, 1e-6)
+    proj_reflectivity[proj_y, proj_x] = reflectivity
+
+    # floating-point indices (needed later):
+    px = proj_x.astype(np.float32)
+    py = proj_y.astype(np.float32)
+
+    return proj_range, proj_reflectivity, py, px, H, W
+
+
+
+
 def do_range_projection(
-    points: np.ndarray, reflectivity: np.ndarray, W: int = 2049, H: int = 65,
+    points: np.ndarray, reflectivity: np.ndarray, W: int = 2048, H: int = 64
 ):
+    
+    W = W + 1  # add 1 so that last bin never wraps
+    H = H + 1  # +1 sentinel row, exactly like the HDL-64E code
     # get depth of all points
     depth = np.linalg.norm(points, 2, axis=1)
 
@@ -256,13 +303,15 @@ def main(args):
                     # ==================Auxillary transformation==================
 
 
-
-                (depth_image, refl_image, py, px) = do_range_projection(points_xyz, points_refl)
+                W = 2048
+                H = 64
+                # (depth_image, refl_image, py, px) = do_range_projection(points_xyz, points_refl)
+                (depth_image, refl_image, py, px, H, W) = do_range_projection(points_xyz, points_refl, W, H)
 
                 if view_img:
                     # Visualize the range image
-                    depth_image = cv2.resize(depth_image, (2049, 65), interpolation=cv2.INTER_LINEAR)
-                    refl_image = cv2.resize(refl_image, (2049, 65), interpolation=cv2.INTER_LINEAR)
+                    depth_image = cv2.resize(depth_image, (W, H), interpolation=cv2.INTER_LINEAR)
+                    refl_image = cv2.resize(refl_image, (W, H), interpolation=cv2.INTER_LINEAR)
 
                     depth_image = np.clip(depth_image * 255, 0, 255).astype(np.uint8)
                     refl_image = np.clip(refl_image * 255, 0, 255).astype(np.uint8)
@@ -327,7 +376,6 @@ def main(args):
                 px = items["px"].float().to(device)
                 pxyz = items["points_xyz"].float().to(device)
                 knns = items["knns"].long().to(device)
-
                 
                 predictions = model(images, px, py, pxyz, knns)
                 _, predictions_argmax = torch.max(predictions, 1)

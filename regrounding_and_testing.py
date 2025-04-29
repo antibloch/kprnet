@@ -75,57 +75,101 @@ def _transorm_test(depth, refl, labels, py, px):
 
 
 
+def do_range_projection(points, reflectivity,
+                        cols: int = 2048, channels: int = 64):
+    """
+    points:  (N,3)
+    reflectivity: (N,)
+    cols:  horizontal samples per revolution (512/1024/2048)
+    channels: vertical scan lines (OS-1-128 ⇒ 128)
+    """
 
-def do_range_projection(
-    points: np.ndarray, reflectivity: np.ndarray, W: int = 2049, H: int = 65,
-):
-    # get depth of all points
-    depth = np.linalg.norm(points, 2, axis=1)
+    W = cols + 1            # add 1 so that last bin never wraps
+    H = channels + 1        # +1 sentinel row, exactly like the HDL-64E code
 
-    # get scan components
-    scan_x = points[:, 0]
-    scan_y = points[:, 1]
-    scan_z = points[:, 2]
+    depth = np.linalg.norm(points, axis=1)
+    yaw   = -np.arctan2(points[:,1], -points[:,0])
+    proj_x_norm = (yaw / np.pi + 1.0) * 0.5         # [0,1]
 
-    # get angles of all points
-    yaw = -np.arctan2(scan_y, -scan_x)
-    proj_x = 0.5 * (yaw / np.pi + 1.0)  # in [0.0, 1.0]
+    # --------------- scan-line–based row index ---------------
+    wrap = (proj_x_norm[1:] < 0.2) & (proj_x_norm[:-1] > 0.8)
+    proj_y = np.concatenate(([0], np.cumsum(wrap))).astype(np.int32)
+    
+    # ---------------------------------------------------------
 
-    new_raw = np.nonzero((proj_x[1:] < 0.2) * (proj_x[:-1] > 0.8))[0] + 1
-    proj_y = np.zeros_like(proj_x)
-    proj_y[new_raw] = 1
-    proj_y = np.cumsum(proj_y)
-    # scale to image size using angular resolution
-    proj_x = proj_x * W - 0.001
+    proj_x = (proj_x_norm * W - 1e-3).astype(np.int32)
+    H = proj_y.max() + 1
+    proj_y = np.minimum(proj_y, H - 1)              # safety clip
 
-    # proj_x = np.clip(proj_x, 0, W-1)
-    # proj_y = np.clip(proj_y, 0, H-1)
+    order = np.argsort(depth)[::-1]                 # z-buffer
+    depth, reflectivity, proj_x, proj_y = [a[order] for a in
+                                           (depth, reflectivity, proj_x, proj_y)]
 
-    H = int(proj_y.max())+1
-    print(f"Height: {H}")
-
-    px = proj_x.copy()
-    py = proj_y.copy()
-
-    proj_x = np.floor(proj_x).astype(np.int32)
-    proj_y = np.floor(proj_y).astype(np.int32)
-
-    # order in decreasing depth
-    order = np.argsort(depth)[::-1]
-
-    depth = depth[order]
-    reflectivity = reflectivity[order]
-    proj_y = proj_y[order]
-    proj_x = proj_x[order]
-
-    proj_range = np.zeros((H, W))
-    depth[depth == 0] = 1e-6
-    proj_range[proj_y, proj_x] = 1.0 / depth
-
-    proj_reflectivity = np.zeros((H, W))
+    proj_range        = np.zeros((H, W), dtype=np.float32)
+    proj_reflectivity = np.zeros_like(proj_range)
+    proj_range[proj_y, proj_x]        = 1.0 / np.maximum(depth, 1e-6)
     proj_reflectivity[proj_y, proj_x] = reflectivity
 
-    return (proj_range, proj_reflectivity, py, px)
+    # floating-point indices (needed later):
+    px = proj_x.astype(np.float32)
+    py = proj_y.astype(np.float32)
+
+    return proj_range, proj_reflectivity, py, px, H, W
+
+
+
+# def do_range_projection(
+#     points: np.ndarray, reflectivity: np.ndarray, W: int = 2049, H: int = 65,
+# ):
+#     # get depth of all points
+#     depth = np.linalg.norm(points, 2, axis=1)
+
+#     # get scan components
+#     scan_x = points[:, 0]
+#     scan_y = points[:, 1]
+#     scan_z = points[:, 2]
+
+#     # get angles of all points
+#     yaw = -np.arctan2(scan_y, -scan_x)
+#     yaw_range = np.max(yaw) - np.min(yaw)
+#     print(f"Yaw range: {yaw_range}")
+#     proj_x = 0.5 * (yaw / np.pi + 1.0)  # in [0.0, 1.0]
+
+#     new_raw = np.nonzero((proj_x[1:] < 0.2) * (proj_x[:-1] > 0.8))[0] + 1
+#     proj_y = np.zeros_like(proj_x)
+#     proj_y[new_raw] = 1
+#     proj_y = np.cumsum(proj_y)
+#     # scale to image size using angular resolution
+#     proj_x = proj_x * W - 0.001
+
+#     # proj_x = np.clip(proj_x, 0, W-1)
+#     # proj_y = np.clip(proj_y, 0, H-1)
+
+#     H = int(proj_y.max())+1
+#     print(f"Height: {H}")
+
+#     px = proj_x.copy()
+#     py = proj_y.copy()
+
+#     proj_x = np.floor(proj_x).astype(np.int32)
+#     proj_y = np.floor(proj_y).astype(np.int32)
+
+#     # order in decreasing depth
+#     order = np.argsort(depth)[::-1]
+
+#     depth = depth[order]
+#     reflectivity = reflectivity[order]
+#     proj_y = proj_y[order]
+#     proj_x = proj_x[order]
+
+#     proj_range = np.zeros((H, W))
+#     depth[depth == 0] = 1e-6
+#     proj_range[proj_y, proj_x] = 1.0 / depth
+
+#     proj_reflectivity = np.zeros((H, W))
+#     proj_reflectivity[proj_y, proj_x] = reflectivity
+
+#     return (proj_range, proj_reflectivity, py, px)
 
 
 
@@ -188,6 +232,20 @@ def reground(pts, dist_threshold=0.1, ransac_n = 3):
 
     pcd.rotate(R, center=(0, 0, 0))
 
+    phi = np.pi/2
+
+    cos_phi = np.cos(phi)
+    sin_phi = np.sin(phi)
+    Rz = np.array([
+        [cos_phi, -sin_phi, 0],
+        [sin_phi,  cos_phi, 0],
+        [0,             0,  1]
+    ])
+
+    # Rotate around center of pcd in x-y plane
+    pcd.rotate(Rz, center=(0, 0, 0))
+
+
     # Now ground is flat; align x and y
     ground_points = np.asarray(pcd.points)[inliers]
     xy_points = ground_points[:, :2]
@@ -216,6 +274,9 @@ def reground(pts, dist_threshold=0.1, ransac_n = 3):
 
     return final_points
 
+
+
+
 def main():
         auxil_transform = False
         view_img = True
@@ -227,7 +288,11 @@ def main():
 
 
         points_xyz = points[:, :3]
+        
 
+        pcd1 = o3d.geometry.PointCloud()
+        pcd1.points = o3d.utility.Vector3dVector(points_xyz)
+        o3d.io.write_point_cloud("original.ply", pcd1)
 
         print(f"Min x: {points_xyz[:, 0].min()}, Max x: {points_xyz[:, 0].max()}")
         print(f"Min y: {points_xyz[:, 1].min()}, Max y: {points_xyz[:, 1].max()}")
@@ -240,18 +305,28 @@ def main():
         labels = np.zeros((points.shape[0],))
 
 
+
+
+
         points_xyz = points_xyz[:, [1,0,2]]
+
+
+        pcd2 = o3d.geometry.PointCloud()
+        pcd2.points = o3d.utility.Vector3dVector(points_xyz)
+        o3d.io.write_point_cloud("reground.ply", pcd2)
+
+
 
         points_refl = points[:, 3]
         
         
 
-        (depth_image, refl_image, py, px) = do_range_projection(points_xyz, points_refl)
+        (depth_image, refl_image, py, px, H, W) = do_range_projection(points_xyz, points_refl)
 
         if view_img:
             # Visualize the range image
-            depth_image = cv2.resize(depth_image, (2049, 65), interpolation=cv2.INTER_LINEAR)
-            refl_image = cv2.resize(refl_image, (2049, 65), interpolation=cv2.INTER_LINEAR)
+            depth_image = cv2.resize(depth_image, (W,H), interpolation=cv2.INTER_LINEAR)
+            refl_image = cv2.resize(refl_image, (W,H), interpolation=cv2.INTER_LINEAR)
 
             depth_image = np.clip(depth_image * 255, 0, 255).astype(np.uint8)
             refl_image = np.clip(refl_image * 255, 0, 255).astype(np.uint8)
