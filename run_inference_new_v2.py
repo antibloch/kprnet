@@ -214,7 +214,7 @@ def reground(pts, dist_threshold=0.1, ransac_n = 3):
 
 def main(args):
         auxil_transform = False
-        view_img = True
+        view_img = False
         model = deeplab.resnext101_aspp_kp(19)
         model.to(device)
         model.load_state_dict(torch.load(args.checkpoint_path))
@@ -234,10 +234,8 @@ def main(args):
                 points = np.load(correct_point_path)
                 points = points.astype(np.float32)
 
-                points = reground(points, 0.1, 3)
-
-
                 points_xyz = points[:, :3]
+                points_xyz = points_xyz[:, [1,0,2]]
                 labels = np.zeros((points.shape[0],))
 
                 points_refl = points[:, 3]
