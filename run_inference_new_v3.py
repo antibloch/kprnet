@@ -324,18 +324,23 @@ def main(args):
         print("Runnign validation")
         model.eval()
         point_paths = os.listdir(args.point_folder)
+        point_paths = [path for path in point_paths if "points" in path]
         point_paths = sorted(point_paths, key=lambda x: int(x.split("_")[0]))
 
         depth_m_paths = os.listdir(args.point_folder)
+        depth_m_paths = [path for path in depth_m_paths if "depth_m" in path]
         depth_m_paths = sorted(depth_m_paths, key=lambda x: int(x.split("_")[0]))
 
         refl_m_paths = os.listdir(args.point_folder)
+        refl_m_paths = [path for path in refl_m_paths if "refl_m" in path]
         refl_m_paths = sorted(refl_m_paths, key=lambda x: int(x.split("_")[0]))
 
         proj_x_paths = os.listdir(args.point_folder)
+        proj_x_paths = [path for path in proj_x_paths if "proj_x" in path]
         proj_x_paths = sorted(proj_x_paths, key=lambda x: int(x.split("_")[0]))
 
         proj_y_paths = os.listdir(args.point_folder)
+        proj_y_paths = [path for path in proj_y_paths if "proj_y" in path]
         proj_y_paths = sorted(proj_y_paths, key=lambda x: int(x.split("_")[0]))
         
 
@@ -344,7 +349,7 @@ def main(args):
         os.makedirs(args.output_path, exist_ok=True)
 
         with torch.no_grad():
-            for i, point_path, depth_m_path, refl_m_path, proj_x_path, proj_y_path in enumerate(point_paths, depth_m_paths, refl_m_paths, proj_x_paths, proj_y_paths):
+            for i, (point_path, depth_m_path, refl_m_path, proj_x_path, proj_y_path) in enumerate(zip(point_paths, depth_m_paths, refl_m_paths, proj_x_paths, proj_y_paths)):
                 point_name = point_path.split(".")[0]
                 correct_point_path = os.path.join(args.point_folder, point_path)
 
@@ -357,15 +362,37 @@ def main(args):
 
                 points_refl = points[:, 3]
 
-                depth_image = np.load(depth_m_path)
-                refl_image = np.load(refl_m_path)
-                px = np.load(proj_x_path)
-                py = np.load(proj_y_path)
+                depth_image = np.load(os.path.join(args.point_folder, depth_m_path))
+                refl_image = np.load(os.path.join(args.point_folder, refl_m_path))
+                px = np.load(os.path.join(args.point_folder, proj_x_path))
+                py = np.load(os.path.join(args.point_folder, proj_y_path))
+
 
 
                 depth_image, refl_image, labels, py, px = _transorm_test(
                     depth_image, refl_image, labels, py, px
                 )
+
+                if False:
+                    # Visualize the range image
+
+                    depth_image = np.clip(depth_image * 255, 0, 255).astype(np.uint8)
+                    refl_image = np.clip(refl_image * 255, 0, 255).astype(np.uint8)
+
+
+                    # depth_image = cv2.resize(depth_image, (224,224), interpolation=cv2.INTER_LINEAR)
+                    # refl_image = cv2.resize(refl_image, (224,224), interpolation=cv2.INTER_LINEAR)
+
+                    plt.imshow(depth_image, cmap='gray')
+                    plt.title('Depth Image')
+                    plt.axis('off')
+                    plt.show()
+
+                    plt.imshow(refl_image, cmap='gray')
+                    plt.title('Reflectivity Image')
+                    plt.axis('off')
+                    plt.show()
+
 
                 tree = kdtree(points_xyz)
                 _, knns = tree.query(points_xyz, k=7)
