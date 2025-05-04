@@ -28,6 +28,7 @@ def do_range_projection_v2(
     ring_major = True,
     normalize = False,
     visualize = True,
+    inverted_depth = True,
 ):
 
     if ring_major:
@@ -77,7 +78,11 @@ def do_range_projection_v2(
         depth_pixels = np.zeros(W).astype(np.float32)
         refl_pixels = np.zeros(W).astype(np.float32)
 
-        depth_pixels[bin_azimuth_indices] = sorted_bin_depth
+        if not inverted_depth:
+            depth_pixels[bin_azimuth_indices] = sorted_bin_depth
+        else:
+            depth_pixels[bin_azimuth_indices] = 1.0/sorted_bin_depth
+            
         refl_pixels[bin_azimuth_indices] = sorted_bin_reflectivity
 
         cum_depth_map.append(depth_pixels)
