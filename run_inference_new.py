@@ -46,7 +46,7 @@ class NPYSemanticStyle(Dataset):
                 normalize: bool = False,
                 visualize: bool = False,
                 inverted_depth: bool = True,
-                 use_train_aug: bool = False):
+                use_train_aug: bool = False):
 
         super().__init__()
         self.npy_paths = sorted(
@@ -214,7 +214,6 @@ def run_inference(args):
                             normalize= args.normalize,
                             visualize= args.visualize,
                             inverted_depth= args.inverted_depth,
-                            use_train_aug= args.use_train_aug
                           )
     dl = DataLoader(ds,
                     batch_size=1,
@@ -259,9 +258,9 @@ if __name__ == "__main__":
     parser.add_argument("--H", default=64, type=int)
     parser.add_argument("--fov_up", default=2.0, type=float)
     parser.add_argument("--fov_down", default=-24.9, type=float)
-    parser.add_argument("--ring_major", default=True, type=bool)
-    parser.add_argument("--normalize", default=False, type=bool)
-    parser.add_argument("--visualize", default=False, type=bool)
-    parser.add_argument("--inverted_depth", default=True, type=bool)
+    parser.add_argument("--ring_major", default=True, action = 'store_true')
+    parser.add_argument("--normalize", default=False, action= 'store_true')
+    parser.add_argument("--visualize", default=False, action= 'store_true')
+    parser.add_argument("--inverted_depth", default=True, action = 'store_true')
     args = parser.parse_args()
     run_inference(args)
