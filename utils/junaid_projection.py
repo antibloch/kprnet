@@ -4,10 +4,96 @@ import numpy as np
 
 
 
+def do_range_projection(
+    points: np.ndarray, reflectivity: np.ndarray, W: int = 2049, H: int = 65,
+):
+    # get depth of all points
+    depth = np.linalg.norm(points, 2, axis=1)
+
+    # get scan components
+    scan_x = points[:, 0]
+    scan_y = points[:, 1]
+    scan_z = points[:, 2]
+
+    # get angles of all points
+    yaw = -np.arctan2(scan_y, -scan_x)
+    proj_x = 0.5 * (yaw / np.pi + 1.0)  # in [0.0, 1.0]
+
+    new_raw = np.nonzero((proj_x[1:] < 0.2) * (proj_x[:-1] > 0.8))[0] + 1
+    proj_y = np.zeros_like(proj_x)
+    proj_y[new_raw] = 1
+    proj_y = np.cumsum(proj_y)
+
+    # yaw = -np.arctan2(points[:, 1], -points[:, 0]) 
+    ring = ((np.unwrap(yaw) - yaw[0]) / (2*np.pi)).astype(np.int32)
+    # proj_y = (ring % H).astype(np.int32)   
+
+
+    # scale to image size using angular resolution
+    proj_x = proj_x * W - 0.001
+
+    px = proj_x.copy()
+    py = proj_y.copy()
+
+    proj_x = np.floor(proj_x).astype(np.int32)
+    proj_y = np.floor(proj_y).astype(np.int32)
+
+    # order in decreasing depth
+    order = np.argsort(depth)[::-1]
+
+    depth = depth[order]
+    reflectivity = reflectivity[order]
+    proj_y = proj_y[order]
+    proj_x = proj_x[order]
+
+    proj_range = np.zeros((H, W))
+    proj_range[proj_y, proj_x] = 1.0 / depth
+
+    proj_reflectivity = np.zeros((H, W))
+    proj_reflectivity[proj_y, proj_x] = reflectivity
+
+    plt.figure(figsize=(12, 4))
+    plt.subplot(2, 1, 1)
+    plt.title("Depth (m)")
+    plt.imshow(proj_range, cmap='gray',
+            vmin=0, vmax=np.percentile(proj_range, 99))
+    plt.axis('off')
+    plt.subplot(2, 1, 2)
+    plt.title("Reflectivity")
+    plt.imshow(proj_reflectivity, cmap='gray',
+            vmin=np.min(proj_reflectivity[proj_reflectivity > 0]),
+            vmax=np.percentile(proj_reflectivity, 99))
+    
+    plt.axis('off')
+    plt.tight_layout();   plt.show()
+
+
+
+    return (proj_range, proj_reflectivity, py, px)
+
+
+
 def indices_from_yaw(points, H):
     yaw = -np.arctan2(points[:, 1], -points[:, 0]) 
     ring = ((np.unwrap(yaw) - yaw[0]) / (2*np.pi)).astype(np.int32)
-    return (ring % H).astype(np.int32)         
+    return (ring % H).astype(np.int32)     
+
+
+# def indices_from_yaw(points, H):
+#     scan_x = points[:, 0]
+#     scan_y = points[:, 1]
+    
+#     yaw = -np.arctan2(scan_y, -scan_x)
+#     proj_x = 0.5 * (yaw / np.pi + 1.0)  # in [0.0, 1.0]
+
+#     new_raw = np.nonzero((proj_x[1:] < 0.2) * (proj_x[:-1] > 0.8))[0] + 1
+#     proj_y = np.zeros_like(proj_x)
+#     proj_y[new_raw] = 1
+#     proj_y = np.cumsum(proj_y)
+#     proj_y = np.floor(proj_y).astype(np.int32)
+
+#     return proj_y
+
 
 
 def indices_from_elevation(points, beam_alt_deg):
@@ -30,18 +116,22 @@ def do_range_projection_v2(
     visualize = True,
     inverted_depth = True,
 ):
+    print(f"Beam Altitude: {beam_alt_deg}")
 
     if ring_major:
+        print("Ring Major")
         bin_indices = indices_from_yaw(points, H)  
+
+
+    elif len(beam_alt_deg)>0:
+        # asda
+        beam_alts = np.asarray(beam_alt_deg)  # degrees
+        bin_indices = indices_from_elevation(points, beam_alts) 
 
     elif beam_alt_deg is None and fov_up is not None and fov_down is not None:
         beam_alts = np.linspace(fov_down, fov_up, H)         
         bin_indices = indices_from_elevation(points, beam_alts) 
         bin_indices = np.flip(bin_indices, axis=0)
-
-    elif beam_alt_deg is not None:
-        beam_alts = np.asarray(beam_alt_deg)  # degrees
-        bin_indices = indices_from_elevation(points, beam_alts) 
 
     else:
         num_p_bin = np.ceil(len(points)/H).astype(int)
@@ -81,7 +171,7 @@ def do_range_projection_v2(
         if not inverted_depth:
             depth_pixels[bin_azimuth_indices] = sorted_bin_depth
         else:
-            depth_pixels[bin_azimuth_indices] = 1.0/sorted_bin_depth
+            depth_pixels[bin_azimuth_indices] = 1.0/(0.5+sorted_bin_depth)
             
         refl_pixels[bin_azimuth_indices] = sorted_bin_reflectivity
 
@@ -103,9 +193,9 @@ def do_range_projection_v2(
     cum_depth = np.concatenate(cum_depth)
 
     # in TOM-TOM's KPRNet, evaluation, inorder to get returning proj_x and proj_y
-    tom_order = np.argsort(cum_depth)[::-1]
-    proj_y = proj_y[tom_order]
-    proj_x = proj_x[tom_order]
+    # tom_order = np.argsort(cum_depth)[::-1]
+    # proj_y = proj_y[tom_order]
+    # proj_x = proj_x[tom_order]
 
 
     # normalize depth and reflectance values to [0, 1]
