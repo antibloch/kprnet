@@ -20,52 +20,6 @@ def _transorm_test(depth, refl, labels, py, px):
 
 
 
-
-
-# def do_range_projection(
-#     points: np.ndarray, reflectivity: np.ndarray, W: int = 2049, H: int = 65,
-# ):
-#     # get depth of all points
-#     depth = np.linalg.norm(points, 2, axis=1)
-
-#     # get scan components
-#     scan_x = points[:, 0]
-#     scan_y = points[:, 1]
-#     scan_z = points[:, 2]
-
-#     # get angles of all points
-#     yaw = -np.arctan2(scan_y, -scan_x)
-#     proj_x = 0.5 * (yaw / np.pi + 1.0)  # in [0.0, 1.0]
-
-#     new_raw = np.nonzero((proj_x[1:] < 0.2) * (proj_x[:-1] > 0.8))[0] + 1
-#     proj_y = np.zeros_like(proj_x)
-#     proj_y[new_raw] = 1
-#     proj_y = np.cumsum(proj_y)
-#     # scale to image size using angular resolution
-#     proj_x = proj_x * W - 0.001
-
-#     px = proj_x.copy()
-#     py = proj_y.copy()
-
-#     proj_x = np.floor(proj_x).astype(np.int32)
-#     proj_y = np.floor(proj_y).astype(np.int32)
-
-#     # order in decreasing depth
-#     order = np.argsort(depth)[::-1]
-
-#     depth = depth[order]
-#     reflectivity = reflectivity[order]
-#     proj_y = proj_y[order]
-#     proj_x = proj_x[order]
-
-#     proj_range = np.zeros((H, W))
-#     proj_range[proj_y, proj_x] = 1.0 / depth
-
-#     proj_reflectivity = np.zeros((H, W))
-#     proj_reflectivity[proj_y, proj_x] = reflectivity
-
-#     return (proj_range, proj_reflectivity, py, px)
-
 # (If you already pasted those helpers in your file, just import them.)
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 # ------------------------------------------------------------

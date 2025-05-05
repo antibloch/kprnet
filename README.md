@@ -30,7 +30,11 @@ python run_inference.py --semantic-kitti-dir kitti_dataset/dataset/sequences --o
 ```
 
 ```bash
-python view_inference_v2.py --points kitti_dataset/dataset/sequences/08/velodyne --labels kitti_dataset/dataset/sequences/08/labels --predictions pred_stuff/sequences/08/predictions --results results
+# Velodyne Scan
+python run_inference_new.py --checkpoint_path pretrained_total_model/kpr_trained.pth --point_folder data --output_path points_segment --W 2048 --H 64 --fov_up 2.0 --fov_down -24.9 --ring_major --visualize --inverted_depth
+
+# Ouster Scan
+python run_inference_new.py --checkpoint_path pretrained_total_model/kpr_trained.pth --point_folder data --output_path points_segment --W 1024 --H 64 --fov_up 44.07 --fov_down -45.73  --visualize --inverted_depth
 ```
 
 The fully trained model weights can be downloaded [here](https://drive.google.com/file/d/11mUMdFPNT-05lC54Ru_2OwdwqTPV4jrW/view?usp=sharing) .
