@@ -1,264 +1,253 @@
-import argparse
+# infer_npy_semkitti_style.py
+# ------------------------------------------------------------
+import os, numpy as np, cv2, torch, open3d as o3d
 from pathlib import Path
-
-import numpy as np
-import torch
 from tqdm import tqdm
 from scipy.spatial.ckdtree import cKDTree as kdtree
-
-from datasets.semantic_kitti import (
-    SemanticKitti,
-    class_names,
-    map_inv,
-    splits,
-)
-from utils.evaluation import Eval
+from torch.utils.data import Dataset, DataLoader
 from models import deeplab
-import cv2
-import os
-
-
-
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
-
-def _transorm_train(depth, refl, labels, py, px, points_xyz):
-    new_h = 289
-    new_w = 4097
-
-    py = new_h * py / 65.0
-    px = new_w * px / 2049.0
-
-    depth = cv2.resize(depth, (new_w, new_h), interpolation=cv2.INTER_LINEAR)
-    refl = cv2.resize(refl, (new_w, new_h), interpolation=cv2.INTER_LINEAR)
-
-    offset_x = np.random.randint(depth.shape[1] - 1025 + 1)
-    offset_y = np.random.randint(depth.shape[0] - 289 + 1)
-
-    depth = depth[offset_y : offset_y + 289, offset_x : offset_x + 1025]
-    refl = refl[offset_y : offset_y + 289, offset_x : offset_x + 1025]
-
-    py = (py - offset_y) / 289.0
-    px = (px - offset_x) / 1025.0
-
-    valid = (px >= 0) & (px <= 1) & (py >= 0) & (py <= 1)
-    labels = labels[valid]
-    px = px[valid]
-    py = py[valid]
-    points_xyz = points_xyz[valid, :]
-    px = 2.0 * (px - 0.5)
-    py = 2.0 * (py - 0.5)
-
-    if np.random.uniform() > 0.5:
-        depth = np.flip(depth, axis=1).copy()
-        refl = np.flip(refl, axis=1).copy()
-        px *= -1
-
-    if px.shape[0] < 38_000:
-        pad_len = 38_000 - px.shape[0]
-        px = np.hstack([px, np.zeros((pad_len,))])
-        py = np.hstack([py, np.zeros((pad_len,))])
-        labels = np.hstack([labels, 255 * np.ones((pad_len,))])
-
-    return depth, refl, labels, py, px, points_xyz
-
+from utils.evaluation import Eval
+import matplotlib.pyplot as plt
+from utils.junaid_projection import do_range_projection_v2
+# model (same as before)
+from models import deeplab
+import argparse
 
 
 def _transorm_test(depth, refl, labels, py, px):
     depth = cv2.resize(depth, (4097, 289), interpolation=cv2.INTER_LINEAR)
     refl = cv2.resize(refl, (4097, 289), interpolation=cv2.INTER_LINEAR)
     py = 2 * (py / 65.0 - 0.5)
-    px = 2 * (px / 2049.0 - 0.5)
+    px = 2 * (px / 1025.0 - 0.5)
 
     return depth, refl, labels, py, px
 
 
 
+# ------------------------------------------------------------
+# 1.  Dataset that mimics SemanticKitti.__getitem__ 100 %
+# ------------------------------------------------------------
+class NPYSemanticStyle(Dataset):
+    """
+    Imitates the original SemanticKitti Dataset class but reads
+    arbitrary *.npy point clouds (N,4) = (x,y,z,intensity).
+    Because you only do *inference*, it always behaves like the
+    'test' split: `labels` is all zeros.
+    """
+    def __init__(self,
+                 npy_dir: str,
+                 split: str = "test",
+                 W: int = 2048,
+                 H: int = 64,
+                fov_up: float = 2.0,
+                fov_down: float = -24.9,
+                beam_alt_deg: float = None,
+                ring_major: bool = True,
+                normalize: bool = False,
+                visualize: bool = False,
+                inverted_depth: bool = True,
+                 use_train_aug: bool = False):
 
-def do_range_projection(
-    points: np.ndarray, reflectivity: np.ndarray, W: int = 2049, H: int = 65,
-):
-    # get depth of all points
-    depth = np.linalg.norm(points, 2, axis=1)
-
-    # get scan components
-    scan_x = points[:, 0]
-    scan_y = points[:, 1]
-    scan_z = points[:, 2]
-
-    # get angles of all points
-    yaw = -np.arctan2(scan_y, -scan_x)
-    proj_x = 0.5 * (yaw / np.pi + 1.0)  # in [0.0, 1.0]
-
-    new_raw = np.nonzero((proj_x[1:] < 0.2) * (proj_x[:-1] > 0.8))[0] + 1
-    proj_y = np.zeros_like(proj_x)
-    proj_y[new_raw] = 1
-    proj_y = np.cumsum(proj_y)
-    # scale to image size using angular resolution
-    proj_x = proj_x * W - 0.001
-
-    px = proj_x.copy()
-    py = proj_y.copy()
-
-    proj_x = np.floor(proj_x).astype(np.int32)
-    proj_y = np.floor(proj_y).astype(np.int32)
-
-    # order in decreasing depth
-    order = np.argsort(depth)[::-1]
-
-    depth = depth[order]
-    reflectivity = reflectivity[order]
-    proj_y = proj_y[order]
-    proj_x = proj_x[order]
-
-    proj_range = np.zeros((H, W))
-    depth[depth == 0] = 1e-6
-    proj_range[proj_y, proj_x] = 1.0 / depth
-
-    proj_reflectivity = np.zeros((H, W))
-    proj_reflectivity[proj_y, proj_x] = reflectivity
-
-    return (proj_range, proj_reflectivity, py, px)
+        super().__init__()
+        self.npy_paths = sorted(
+            [Path(npy_dir) / f for f in os.listdir(npy_dir) if f.endswith(".npy")]
+        )
+        if not self.npy_paths:
+            raise FileNotFoundError(f"No .npy files in {npy_dir}")
+        self.split = split
+        self.use_train_aug = use_train_aug and split == "train"
+        self.W = W
+        self.H = H
+        self. fov_up = fov_up
+        self.fov_down = fov_down
+        self.beam_alt_deg = beam_alt_deg    
+        self.ring_major = ring_major
+        self.normalize = normalize  
+        self.visualize = visualize
+        self.inverted_depth = inverted_depth
+    # ---------------------------- #
+    def __len__(self):
+        return len(self.npy_paths)
+    # ---------------------------- #
+    def __getitem__(self, index):
+        npy_file = self.npy_paths[index]
+        pts = np.load(npy_file).astype(np.float32).reshape(-1, 4)
+        points_xyz = pts[:, :3]            # (N,3)
+        points_refl = pts[:, 3]            # (N,)
 
 
+        labels = np.zeros(points_xyz.shape[0], dtype=np.float32)   # dummy
 
 
+        depth_img, refl_img, py, px, points_xyz, points_refl = do_range_projection_v2(
+                                                                            points=points_xyz, 
+                                                                            reflectivity = points_refl, 
+                                                                            W = self.W, 
+                                                                            H = self.H,
+                                                                            beam_alt_deg = None,
+                                                                            fov_up = self.fov_up,
+                                                                            fov_down = self.fov_down,
+                                                                            ring_major = self.ring_major,
+                                                                            normalize = self.normalize,
+                                                                            visualize = self.visualize,
+                                                                            inverted_depth = self.inverted_depth,
+                                                                        )
 
-def transform_points(pts, p, max_zoom):
-    center = np.mean(pts, axis=0)
+        depth_img, refl_img, labels, py, px = _transorm_test(
+            depth_img, refl_img, labels, py, px
+        )
+        # k-NN exactly as reference
+        tree = kdtree(points_xyz)
+        _, knns = tree.query(points_xyz, k=7)
+        if points_xyz.shape[0] < px.shape[0]:
+            pad_len = px.shape[0] - points_xyz.shape[0]
+            points_xyz = np.vstack([points_xyz, np.zeros((pad_len, 3))])
+            knns = np.vstack([knns, np.zeros((pad_len, 7))])
+        # normalise & pack (unchanged)
+        depth_img = 25 * (depth_img - 0.4)
+        refl_img  = 20 * (refl_img  - 0.5)
+        image = np.stack([depth_img, refl_img]).astype(np.float32)
+        px = px[np.newaxis, :]
+        py = py[np.newaxis, :]
+        labels = labels[np.newaxis, :]
 
-    # Calculate the rotation angle for this frame
-    angle = p * 360.0
+
+        return {
+            "image": image,                  # (2,289,4097) after _transorm_test
+            "labels": labels,                # dummy, kept for API parity
+            "px": px,
+            "py": py,
+            "points_xyz": points_xyz,
+            "knns": knns,
+            "fname": npy_file.name,
+        }
     
-    # Create a rotation matrix around the y-axis
-    rotation_matrix = np.array([
-        [np.cos(np.radians(angle)), 0, np.sin(np.radians(angle))],
-        [0, 1, 0],
-        [-np.sin(np.radians(angle)), 0, np.cos(np.radians(angle))]
-    ])
-    
-        # Apply a constant zoom factor to all frames
-    current_zoom = max_zoom
-    
-    # Apply rotation to the points relative to the center
-    centered_points = pts - center
-    
-    # Apply zoom by scaling the points (zoom in = points appear larger)
-    zoomed_points = centered_points * current_zoom
-    
-    # Apply rotation and shift back
-    pts = np.dot(zoomed_points, rotation_matrix.T) + center
-    return pts
+
+def run_inference(args):
+    # intended for Os0 scan of ouster
+    beam_alt_deg = np.array([
+            44.07,
+            42.42,
+            41.08,
+            39.47,
+            38.12,
+            36.53,
+            35.19,
+            33.61,
+            32.26,
+            30.71,
+            29.36,
+            27.84,
+            26.48,
+            24.98,
+            23.62,
+            22.13,
+            20.77,
+            19.3,
+            17.95,
+            16.5,
+            15.14,
+            13.7,
+            12.33,
+            10.92,
+            9.54,
+            8.13,
+            6.76,
+            5.36,
+            3.98,
+            2.6,
+            1.21,
+            -0.17,
+            -1.55,
+            -2.93,
+            -4.33,
+            -5.7,
+            -7.11,
+            -8.47,
+            -9.88,
+            -11.25,
+            -12.68,
+            -14.04,
+            -15.47,
+            -16.84,
+            -18.29,
+            -19.64,
+            -21.12,
+            -22.46,
+            -23.95,
+            -25.3,
+            -26.8,
+            -28.15,
+            -29.68,
+            -31.02,
+            -32.57,
+            -33.91,
+            -35.48,
+            -36.83,
+            -38.42,
+            -39.77,
+            -41.39,
+            -42.74,
+            -44.39,
+            -45.73
+        ])
 
 
 
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")   
+    model = deeplab.resnext101_aspp_kp(19)
+    model.to(device)
+    model.load_state_dict(torch.load(args.checkpoint_path))
+    print("Runnign validation")
+    model.eval()
+    eval_metric = Eval(19, 255)
+    # dataset & loader *exactly like reference*
+    ds = NPYSemanticStyle(
+                            args.point_folder, 
+                            split="test",
+                            W = args.W,
+                            H = args.H,
+                            fov_up = args.fov_up,
+                            fov_down = args.fov_down,
+                            beam_alt_deg= beam_alt_deg,      # Oor None in case there isnot
+                            ring_major= args.ring_major,
+                            normalize= args.normalize,
+                            visualize= args.visualize,
+                            inverted_depth= args.inverted_depth,
+                            use_train_aug= args.use_train_aug
+                          )
+    dl = DataLoader(ds,
+                    batch_size=1,
+                    shuffle=False,
+                    num_workers=4,
+                    pin_memory=True,
+                    drop_last=False)
+    out_root = Path(args.output_path)
+    out_root.mkdir(parents=True, exist_ok=True)
 
-def main(args):
-        auxil_transform = False
-        view_img = True
-        model = deeplab.resnext101_aspp_kp(19)
-        model.to(device)
-        model.load_state_dict(torch.load(args.checkpoint_path))
-        print("Runnign validation")
-        model.eval()
-        all_point_paths = os.listdir(args.point_folder)
+    with torch.no_grad():
+        for batch in tqdm(dl, desc="predict"):
+            images = batch["image"].to(device)               # (1,2,289,4097)
+            px     = batch["px"].float().to(device)          # (1, N)
+            py     = batch["py"].float().to(device)
+            pxyz   = batch["points_xyz"].float().to(device)  # (N,3) → model expects (1,N,3) – add batch dim
+            # pxyz   = pxyz.unsqueeze(0)
+            knns   = batch["knns"].long().to(device)
+            fname  = batch["fname"][0]
 
-        if os.path.exists(args.output_path):
-            os.system(f"rm -rf {args.output_path}")
-        os.makedirs(args.output_path, exist_ok=True)
-
-        with torch.no_grad():
-            for point_path in all_point_paths:
-                point_name = point_path.split(".")[0]
-                correct_point_path = os.path.join(args.point_folder, point_path)
-
-                points = np.load(correct_point_path)
-                points = points.astype(np.float32)
-                points_xyz = points[:, :3]
-                labels = np.zeros((points.shape[0],))
-
-                points_refl = points[:, 3]
-                
-                
-                # addendum
-                points_xyz = points_xyz[:, [2,0,1]]
-                if auxil_transform:
-                    # ==================Auxillary transformation==================
-                    points_xyz = transform_points(points_xyz, 1/4, 1.0)
-                    points_xyz  = transform_points(points_xyz , 1/2, 1.0)
-                    # ==================Auxillary transformation==================
-
-
-
-                (depth_image, refl_image, py, px) = do_range_projection(points_xyz, points_refl)
-
-                if view_img:
-                    # Visualize the range image
-                    depth_image = cv2.resize(depth_image, (2049, 65), interpolation=cv2.INTER_LINEAR)
-                    refl_image = cv2.resize(refl_image, (2049, 65), interpolation=cv2.INTER_LINEAR)
-
-                    depth_image = np.clip(depth_image * 255, 0, 255).astype(np.uint8)
-                    refl_image = np.clip(refl_image * 255, 0, 255).astype(np.uint8)
-
-                    cv2.imshow("Depth Image", depth_image)
-                    cv2.imshow("Reflectivity Image", refl_image)
-                    cv2.waitKey(0)
-                    cv2.destroyAllWindows()
-
-                depth_image, refl_image, labels, py, px = _transorm_test(
-                    depth_image, refl_image, labels, py, px
-                )
-
-                tree = kdtree(points_xyz)
-                _, knns = tree.query(points_xyz, k=7)
-
-                if points_xyz.shape[0] < px.shape[0]:
-                    pad_len = px.shape[0] - points_xyz.shape[0]
-                    points_xyz = np.vstack([points_xyz, np.zeros((pad_len, 3))])
-                    knns = np.vstack([knns, np.zeros((pad_len, 7))])
-
-                # normalize values to be between -10 and 10
-                depth_image = 25 * (depth_image - 0.4)
-                refl_image = 20 * (refl_image - 0.5)
-                image = np.stack([depth_image, refl_image]).astype(np.float32)
-
-                px = px[np.newaxis, :]
-                py = py[np.newaxis, :]
-                labels = labels[np.newaxis, :]
-
-                images = torch.from_numpy(image).unsqueeze(0).to(device)   # (1, 2, H, W)
-                px     = torch.from_numpy(px).unsqueeze(0).float().to(device)
-                py     = torch.from_numpy(py).unsqueeze(0).float().to(device)
-                labels = torch.from_numpy(labels).unsqueeze(0)
-                pxyz   = torch.from_numpy(points_xyz).unsqueeze(0).float().to(device)
-                knns   = torch.from_numpy(knns).unsqueeze(0).long().to(device)
+            print(f"py: {py.shape}")
+            print(f"px: {px.shape}")
+            print(f"pxyz: {pxyz.shape}")
+            print(f"knns: {knns.shape}")
+            print(f"images: {images.shape}")
 
 
-                items = {
-                    "image": images,
-                    "labels": labels,
-                    "py": py,
-                    "px": px,
-                    "points_xyz": pxyz,
-                    "knns": knns,
-                }
-
-                images = items["image"].to(device)
-                labels = items["labels"]
-                py = items["py"].float().to(device)
-                px = items["px"].float().to(device)
-                pxyz = items["points_xyz"].float().to(device)
-                knns = items["knns"].long().to(device)
-
-                
-                predictions = model(images, px, py, pxyz, knns)
-                _, predictions_argmax = torch.max(predictions, 1)
-                predictions_points = predictions_argmax.cpu().numpy()
-
-                predictions_points = predictions_points.astype(np.uint32)
-
-                out_file = os.path.join(args.output_path, f"{point_name}.npy")
-                np.save(out_file, predictions_points)
+            predictions = model(images, px, py, pxyz, knns)
+            _, predictions_argmax = torch.max(predictions, 1)
+            predictions_points = predictions_argmax.cpu().numpy()
+            predictions_points = (predictions_points.astype(np.uint32))
+            out_file = os.path.join(args.output_path, f"{fname}.npy")
+            np.save(out_file, predictions_points)
 
 
 if __name__ == "__main__":
@@ -266,6 +255,13 @@ if __name__ == "__main__":
     parser.add_argument("--checkpoint-path", required=True, type=Path)
     parser.add_argument("--output_path", required=True, type=Path)
     parser.add_argument("--point_folder", required=True, type=Path)
-
+    parser.add_argument("--W", default=2048, type=int)
+    parser.add_argument("--H", default=64, type=int)
+    parser.add_argument("--fov_up", default=2.0, type=float)
+    parser.add_argument("--fov_down", default=-24.9, type=float)
+    parser.add_argument("--ring_major", default=True, type=bool)
+    parser.add_argument("--normalize", default=False, type=bool)
+    parser.add_argument("--visualize", default=False, type=bool)
+    parser.add_argument("--inverted_depth", default=True, type=bool)
     args = parser.parse_args()
-    main(args)
+    run_inference(args)
