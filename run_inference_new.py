@@ -125,7 +125,7 @@ class NPYSemanticStyle(Dataset):
 
 def run_inference(args):
     # intended for Os0 scan of ouster
-    beam_alt_deg = np.array([
+    beam_alt_deg = [
             44.07,
             42.42,
             41.08,
@@ -190,7 +190,7 @@ def run_inference(args):
             -42.74,
             -44.39,
             -45.73
-        ])
+        ]
 
 
 
@@ -245,7 +245,7 @@ def run_inference(args):
             _, predictions_argmax = torch.max(predictions, 1)
             predictions_points = predictions_argmax.cpu().numpy()
             predictions_points = (predictions_points.astype(np.uint32))
-            out_file = os.path.join(args.output_path, f"{fname}.npy")
+            out_file = os.path.join(args.output_path, f"{fname.split('.')[0]}.npy")
             np.save(out_file, predictions_points)
 
 
