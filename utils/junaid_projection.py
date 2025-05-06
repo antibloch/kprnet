@@ -4,6 +4,55 @@ import numpy as np
 
 
 
+def do_range_projection_salsa(points, reflectance, fov_up, fov_down, H, W):
+    fov = abs(fov_down) + abs(fov_up)
+    print("fov:", fov)
+    print("fov_up:", fov_up)
+    print("fov_down:", fov_down)
+    depth = np.linalg.norm(points, 2, axis=1)+ 1e-6
+    scan_x = points[:, 0]
+    scan_y = points[:, 1]
+    scan_z = points[:, 2]
+    yaw = -np.arctan2(scan_y, scan_x)
+    pitch = np.arcsin(scan_z / depth)
+    # proj_x = ((yaw+np.pi) / (2*np.pi))  # in [0.0, 1.0]
+    proj_x = 0.5 * (yaw / np.pi + 1.0)  # in [0.0, 1.0]
+    proj_y = 1.0 - (pitch + abs(fov_down)) / fov  # in [0.0, 1.0]
+    proj_x *= W  # in [0.0, W]
+    proj_y *= H  # in [0.0, H]
+    px = proj_x.copy()
+    py = proj_y.copy()
+    # round and clamp for use as index
+    proj_x = np.floor(proj_x)
+    proj_x = np.minimum(W - 1, proj_x)
+    proj_x = np.maximum(0, proj_x).astype(np.int32)  # in [0,W-1]
+    proj_y = np.floor(proj_y)
+    proj_y = np.minimum(H - 1, proj_y)
+    proj_y = np.maximum(0, proj_y).astype(np.int32)  # in [0,H-1]
+    print("min / median / max reflectance:", reflectance.min(),
+            np.median(reflectance), reflectance.max())
+    print("min / median / max depth:", depth.min(),
+            np.median(depth), depth.max())
+    print("min / median / max proj_x:", proj_x.min(),
+            np.median(proj_x), proj_x.max())
+    print("min / median / max proj_y:", proj_y.min(),
+            np.median(proj_y), proj_y.max())
+    # order in decreasing depth
+    indices = np.arange(depth.shape[0])
+    order = np.argsort(depth)[::-1]
+    depth = depth[order]
+    indices = indices[order]
+    reflectances = reflectance[order]
+    proj_y = proj_y[order]
+    proj_x = proj_x[order]
+    depthmap   = np.full((H,W), 0, np.float32)
+    reflmap = np.full((H,W), 0, np.float32)
+    depthmap[proj_y, proj_x] = depth
+    reflmap[proj_y, proj_x] = reflectances
+    return depthmap, reflmap, px, py
+
+
+
 def do_range_projection(
     points: np.ndarray, reflectivity: np.ndarray, W: int = 2049, H: int = 65,
 ):
