@@ -9,6 +9,7 @@ from utils.junaid_projection import do_range_projection_v2, do_range_projection
 from models import deeplab
 from utils.evaluation import Eval
 import matplotlib.pyplot as plt
+import shutil
 
 def _transorm_test(depth, refl, labels, py, px):
     depth = cv2.resize(depth, (4097, 289), interpolation=cv2.INTER_LINEAR)
@@ -143,6 +144,19 @@ class NPYSemanticStyle(Dataset):
 # ------------------------------------------------------------
 
 def run_inference(args):
+
+    point_output_path = str(args.output_path) +"_points"
+    if os.path.exists(args.output_path):
+        shutil.rmtree(args.output_path)
+
+    os.makedirs(args.output_path, exist_ok=True)
+
+    if os.path.exists(point_output_path ):
+        shutil.rmtree(point_output_path )
+
+    os.makedirs(point_output_path , exist_ok=True)
+
+
     do_quick_vis = False
     # intended for Os0 scan of ouster
     beam_alt_deg = [
@@ -290,9 +304,13 @@ def run_inference(args):
                 o3d.visualization.draw_geometries([pcd])
 
             else:
-                predictions_points = (predictions_points.astype(np.uint32))
+                points_xyz_ref = batch["points_xyz"].cpu().squeeze(0).numpy()
+                predictions_points = (predictions_points.astype(np.uint32)).flatten()
+                print(f"predictions_points shape: {predictions_points.shape}")
                 out_file = os.path.join(args.output_path, f"{fname.split('.')[0]}.npy")
+                out_file_points = os.path.join(point_output_path, f"{fname.split('.')[0]}.npy")
                 np.save(out_file, predictions_points)
+                np.save(out_file_points, points_xyz_ref)
 
 
         # comment next line if you don’t want the visor

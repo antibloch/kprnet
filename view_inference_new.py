@@ -257,6 +257,10 @@ def main():
     point_fil_names = sorted(point_fil_names, key=lambda x: int(x.split('.')[0]))
     pred_file_names = sorted(pred_file_names, key=lambda x: int(x.split('.')[0]))
 
+    # print(point_fil_names)
+    # print(pred_file_names)
+    # sdf
+
     if os.path.exists(args.results):
         shutil.rmtree(args.results)
 
@@ -274,7 +278,8 @@ def main():
 
 
             predictions = np.load(pred_file_path)
-            predictions = predictions.astype(np.uint32).flatten()
+            predictions = predictions
+
     
             points = data
 
