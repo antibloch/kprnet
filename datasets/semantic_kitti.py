@@ -4,6 +4,7 @@ import cv2
 import numpy as np
 import torch
 from scipy.spatial.ckdtree import cKDTree as kdtree
+from utils.junaid_projection import do_range_projection_salsa
 
 splits = {
     "train": [1, 2, 0, 3, 4, 5, 6, 7, 9, 10],
@@ -91,7 +92,12 @@ class SemanticKitti(torch.utils.data.Dataset):
             labels = np.zeros((points.shape[0],))
 
         points_refl = points[:, 3]
-        (depth_image, refl_image, py, px) = do_range_projection(points_xyz, points_refl)
+        # (depth_image, refl_image, py, px) = do_range_projection(points_xyz, points_refl)
+        (depth_image, refl_image, py, px) = do_range_projection_salsa(points_xyz, points_refl,
+                                                                      fov_up=2.0 ,
+                                                                      fov_down=-24.9,
+                                                                      H= 64 ,
+                                                                      W= 2048)
 
         if self.split == "train":
             depth_image, refl_image, labels, py, px, points_xyz = _transorm_train(
