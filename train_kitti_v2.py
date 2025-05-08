@@ -84,7 +84,7 @@ def train():
 
     train_loader = torch.utils.data.DataLoader(
         train_dataset,
-        batch_size=2,
+        batch_size=8,
         num_workers=1,
         drop_last=True,
         shuffle=False,
