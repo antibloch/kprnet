@@ -84,7 +84,7 @@ def train():
 
     train_loader = torch.utils.data.DataLoader(
         train_dataset,
-        batch_size=8,
+        batch_size=2,
         num_workers=1,
         drop_last=True,
         shuffle=False,
@@ -113,7 +113,7 @@ def train():
         model.train()
         for step, items in enumerate(train_loader):
             images = items["image"].cuda(non_blocking=True)
-            # labels = items["labels"].long().cuda(non_blocking=True)
+            labels = items["labels"].long().cuda(non_blocking=True)
             # py = items["py"].float().cuda(non_blocking=True)
             # px = items["px"].float().cuda(non_blocking=True)
             py = items["py"].float().cuda(non_blocking=True).detach()
@@ -124,14 +124,6 @@ def train():
             
             predictions = model(images, px, py, pxyz, knns)
 
-            # Delete input tensors ASAP
-            del images, py, px, pxyz, knns
-            gc.collect()
-            torch.cuda.empty_cache()
-
-
-            # Move only labels to CUDA at loss time
-            labels = items["labels"].long().cuda(non_blocking=True)
 
             loss = loss_fn(predictions, labels)
             optimizer.zero_grad()
