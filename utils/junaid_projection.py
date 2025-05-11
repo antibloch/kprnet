@@ -4,6 +4,8 @@ import numpy as np
 
 
 
+
+
 def do_range_projection_salsa(points, reflectance, fov_up, fov_down, H, W):
     fov = abs(fov_down) + abs(fov_up)
     print("fov:", fov)
@@ -118,7 +120,61 @@ def do_range_projection(
 
 
 
-    return (proj_range, proj_reflectivity, py, px)
+    return (proj_range, proj_reflectivity, px, py)
+
+
+
+def spherical_projection(points, 
+                         reflectance,
+                         fov_up_deg: float, 
+                         fov_down_deg: float,
+                         H: int, 
+                         W: int):
+
+    # 1) convert FOV to radians
+    fov_up   = np.deg2rad(fov_up_deg)
+    fov_down = np.deg2rad(fov_down_deg)
+    fov = abs(fov_down) + abs(fov_up)
+
+    # 2) depths and angles
+    x, y, z = points[:,0], points[:,1], points[:,2]
+    depth = np.linalg.norm(points, axis=1) + 1e-6  # avoid zero
+
+    yaw   = -np.arctan2(y, x)                # [-π, +π]
+    pitch = np.arcsin(z / depth)            # [-π/2, +π/2]
+
+    # 3) normalized projection coords in [0..1]
+    proj_x = 0.5 * (yaw/np.pi + 1.0)         # azimuth → [0..1]
+    proj_y = 1.0 - (pitch + abs(fov_down))/fov  # elevation → [0..1]
+
+    # 4) scale to image size
+    proj_x = proj_x * W
+    proj_y = proj_y * H
+
+    # 5) integer pixel indices
+    px = np.floor(proj_x).astype(np.int32)
+    py = np.floor(proj_y).astype(np.int32)
+
+    # clamp into valid range
+    np.clip(px, 0, W-1, out=px)
+    np.clip(py, 0, H-1, out=py)
+
+    # 6) prepare output maps
+    depth_map = np.zeros((H, W), dtype=np.float32)
+    refl_map  = np.zeros((H, W), dtype=np.float32)
+
+    # 7) sort points far→near so nearer overwrite farther
+    order = np.argsort(depth)[::-1]
+    px_ord = px[order]
+    py_ord = py[order]
+    depth_ord = depth[order]
+    refl_ord  = reflectance[order]
+
+    # 8) fill
+    depth_map[py_ord, px_ord] = depth_ord
+    refl_map [py_ord, px_ord] = refl_ord
+
+    return depth_map, refl_map, px, py
 
 
 
