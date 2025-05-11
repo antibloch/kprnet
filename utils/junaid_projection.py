@@ -16,7 +16,7 @@ def do_range_projection_salsa(points, reflectance, fov_up, fov_down, H, W):
     scan_x = points[:, 0]
     scan_y = points[:, 1]
     scan_z = points[:, 2]
-    yaw = -np.arctan2(scan_y, scan_x)
+    yaw = -np.arctan2(scan_y, -scan_x)
     pitch = np.arcsin(scan_z / depth)
     # proj_x = ((yaw+np.pi) / (2*np.pi))  # in [0.0, 1.0]
     proj_x = 0.5 * (yaw / np.pi + 1.0)  # in [0.0, 1.0]
@@ -143,7 +143,7 @@ def spherical_projection(points,
     x, y, z = points[:,0], points[:,1], points[:,2]
     depth = np.linalg.norm(points, axis=1) + 1e-6  # avoid zero
 
-    yaw   = -np.arctan2(y, x)                # [-π, +π]
+    yaw   = -np.arctan2(y, -x)                # [-π, +π]
     pitch = np.arcsin(z / depth)            # [-π/2, +π/2]
 
     # 3) normalized projection coords in [0..1]
