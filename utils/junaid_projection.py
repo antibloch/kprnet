@@ -7,6 +7,7 @@ import numpy as np
 
 
 def do_range_projection_salsa(points, reflectance, fov_up, fov_down, H, W):
+    # assumes fov up and down are in radians
     fov = abs(fov_down) + abs(fov_up)
     print("fov:", fov)
     print("fov_up:", fov_up)
