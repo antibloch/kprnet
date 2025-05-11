@@ -131,6 +131,8 @@ def spherical_projection(points,
                          H: int, 
                          W: int):
 
+    # based on salsa's projection function
+
     # 1) convert FOV to radians
     fov_up   = np.deg2rad(fov_up_deg)
     fov_down = np.deg2rad(fov_down_deg)
