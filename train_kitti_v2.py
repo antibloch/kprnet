@@ -124,12 +124,6 @@ def train():
             
             predictions = model(images, px, py, pxyz, knns)
 
-            print(predictions.shape, labels.shape)
-
-            predictions = predictions.squeeze(2)            # [B, 19, N]
-            labels = labels.squeeze(1)            # [B, N]
-
-
             loss = loss_fn(predictions, labels)
             optimizer.zero_grad()
             loss.backward()
