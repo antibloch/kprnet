@@ -766,14 +766,17 @@ def concrete_pathetic_projection_extended(
         plt.tight_layout();   plt.show()
 
 
-        plt.figure(figsize=(12, 12))
+        total_cl_map = np.zeros((H, W, 3), dtype=np.float32)
         for i in range(len(cl_maps)):
-            plt.subplot(len(cl_maps), 1, i+1)
-            plt.imshow(cl_maps[i])
-            plt.axis('off')
-            plt.tight_layout()
-        
+            total_cl_map += cl_maps[i]
+
+
+        plt.figure(figsize=(12, 12))
+        plt.imshow(total_cl_map)
+        plt.axis('off')
+        plt.tight_layout()
         plt.show()
+
 
     return (depth_img, reflectance_img, proj_x, proj_y, beeth_points, points_2_image_indices)
   
