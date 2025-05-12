@@ -95,8 +95,8 @@ class SemanticKitti(torch.utils.data.Dataset):
         # (depth_image, refl_image, py, px) = do_range_projection(points_xyz, points_refl)
         (depth_image, refl_image, px, py) = spherical_projection(points_xyz, 
                                                                  points_refl,
-                                                                      fov_up=2.0 ,
-                                                                      fov_down=-24.9,
+                                                                      fov_up_deg=2.0 ,
+                                                                      fov_down_deg=-24.9,
                                                                       H= 64 ,
                                                                       W= 2048)
 
