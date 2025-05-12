@@ -456,6 +456,13 @@ def concrete_pathetic_projection(
     visualize = True,
     inverted_depth = True,
 ):
+    def indices_from_elevation(points, beam_alt_deg):
+        beam_alt = np.deg2rad(beam_alt_deg)           
+        depth    = np.linalg.norm(points, axis=1) + 1e-6
+        elev     = np.arcsin(points[:, 2] / depth)                
+        return np.argmin(np.abs(elev[:, None] - beam_alt[None, :]), axis=1)
+    
+        
 
     r = np.linalg.norm(points, axis=1) + 1e-6
     elevation = np.arcsin(points[:, 2] / r)  # [-π/2, +π/2] 
