@@ -489,6 +489,7 @@ def concrete_pathetic_projection(
 
     ordered_bin_indices = np.sort(np.unique(bin_indices))
     ordered_bin_indices = np.flip(ordered_bin_indices, axis=0)  # top to bottom
+    max_ordered_bin_index = np.max(ordered_bin_indices)
 
 
     point_indices = []
@@ -532,7 +533,7 @@ def concrete_pathetic_projection(
         cum_reflectance_map.append(refl_pixels)
 
         proj_x.append(bin_azimuth_indices)
-        proj_y.append(np.ones_like(bin_azimuth_indices) * i)
+        proj_y.append(np.ones_like(bin_azimuth_indices) * (max_ordered_bin_index-i))
         cum_points.append(sorted_bin_points)
         cum_reflectivity.append(sorted_bin_reflectivity)
         cum_depth.append(sorted_bin_depth)
@@ -636,6 +637,7 @@ def concrete_pathetic_projection_extended(
 
     ordered_bin_indices = np.sort(np.unique(bin_indices))
     ordered_bin_indices = np.flip(ordered_bin_indices, axis=0)  # top to bottom
+    max_ordered_bin_index = np.max(ordered_bin_indices)
 
 
     point_indices = []
@@ -679,7 +681,7 @@ def concrete_pathetic_projection_extended(
         cum_reflectance_map.append(refl_pixels)
 
         proj_x.append(bin_azimuth_indices)
-        proj_y.append(np.ones_like(bin_azimuth_indices) * i)
+        proj_y.append(np.ones_like(bin_azimuth_indices) * (max_ordered_bin_index-i))
         cum_points.append(sorted_bin_points)
         cum_reflectivity.append(sorted_bin_reflectivity)
         cum_depth.append(sorted_bin_depth)
