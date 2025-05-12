@@ -543,14 +543,14 @@ def concrete_pathetic_projection(
     ref_proj_y = proj_y.copy()
 
     sort_order = np.argsort(cum_point_indices)
-    cum_points = cum_points[sort_order]
+    cum_point_indices = cum_point_indices[sort_order]
     ref_proj_x = ref_proj_x[sort_order]
     ref_proj_y = ref_proj_y[sort_order]
 
     points_2_image_indices = {}
 
-    for i in range(len(cum_points)):
-        points_2_image_indices[cum_points[i]] = [ref_proj_y[i], ref_proj_x[i]]
+    for i in range(len(cum_point_indices)):
+        points_2_image_indices[cum_point_indices[i]] = [ref_proj_y[i], ref_proj_x[i]]
 
 
     # normalize depth and reflectance values to [0, 1]
