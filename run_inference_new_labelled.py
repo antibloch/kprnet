@@ -86,7 +86,7 @@ class NPYSemanticStyle(Dataset):
         
 
 
-        (depth_image, refl_image, px, py) = spherical_projection(points_xyz, 
+        (depth_img, refl_img, px, py) = spherical_projection(points_xyz, 
                                                                   points_refl,
                                                                 fov_up_deg=self.fov_up ,
                                                                 fov_down_deg=self.fov_down,
