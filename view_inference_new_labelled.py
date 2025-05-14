@@ -276,6 +276,7 @@ def main():
         shutil.rmtree(args.results)
 
     os.makedirs(args.results, exist_ok=True)
+    conf_matrix = np.zeros((num_classes, num_classes), dtype=np.uint64)
 
 
     for id, point_file, label_file, pred_file in zip(range(len(point_fil_names)), point_fil_names, label_file_names, pred_file_names):
@@ -298,9 +299,21 @@ def main():
     
             points = data
 
+            valid_mask = (labels >= 0) & (labels < num_classes)
+            valid_preds = predictions[valid_mask]
+            valid_labels = labels[valid_mask]
+            for t, p in zip(valid_labels, valid_preds):
+                if 0 <= t < num_classes and 0 <= p < num_classes:
+                    conf_matrix[t, p] += 1
+
+
 
             pred_colors = np.zeros((len(predictions), 3), dtype=np.float32)
             ref_colors = np.zeros((len(labels), 3), dtype=np.float32)
+
+
+            # computer per class IoU and mIOU
+
 
             for label in range(num_classes):
                 pred_colors[predictions == label] = colors[label]
@@ -317,6 +330,25 @@ def main():
 
 
             view_frame(points,  pred_colors, ref_colors,  legend_patches, args.results, id)
+
+
+    print("\n==== Per-Class IoU and mIoU ====")
+    ious = []
+    for i in range(num_classes):
+        TP = conf_matrix[i, i]
+        FP = conf_matrix[:, i].sum() - TP
+        FN = conf_matrix[i, :].sum() - TP
+        denom = TP + FP + FN
+        if denom == 0:
+            iou = float('nan')
+        else:
+            iou = TP / denom
+        ious.append(iou)
+        print(f"{class_names[i]:<15}: IoU = {iou:.4f}" if not np.isnan(iou) else f"{class_names[i]:<15}: IoU = N/A (class absent)")
+
+    valid_ious = [iou for iou in ious if not np.isnan(iou)]
+    mean_iou = np.mean(valid_ious)
+    print(f"\nMean IoU over {len(valid_ious)} valid classes: {mean_iou:.4f}")
 
     # Create a video from the saved frames
     create_video_from_frames(args.results, os.path.join(args.results, "output_video.mp4"), fps=2)
