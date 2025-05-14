@@ -319,7 +319,7 @@ def run_inference(args):
                 print(f"label_points shape: {label_points.shape}")
                 out_file_labels = os.path.join(labels_output_path, f"{fname.split('.')[0]}.npy")
                 out_file_points = os.path.join(point_output_path, f"{fname.split('.')[0]}.npy")
-                out_file_predictions = os.path.join(out_root, f"{fname.split('.')[0]}.npy")
+                out_file_predictions = os.path.join(predictions_output_path, f"{fname.split('.')[0]}.npy")
                 np.save(out_file_predictions, predictions_points)
                 np.save(out_file_points, points_xyz_ref)
                 np.save(out_file_labels, label_points)
