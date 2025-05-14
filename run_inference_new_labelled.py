@@ -244,6 +244,7 @@ def run_inference(args):
     # dataset & loader *exactly like reference*
     ds = NPYSemanticStyle(
                             args.point_folder, 
+                            args.labels_folder,
                             split="test",
                             W = args.W,
                             H = args.H,
@@ -336,6 +337,7 @@ if __name__ == "__main__":
     parser.add_argument("--checkpoint_path", required=True, type=Path)
     parser.add_argument("--output_path", required=True, type=Path)
     parser.add_argument("--point_folder", required=True, type=Path)
+    parser.add_argument("--labels_folder", required=True, type=Path)
     parser.add_argument("--W", default=1024, type=int)
     parser.add_argument("--H", default=64, type=int)
     parser.add_argument("--fov_up", default=44.07, type=float)
