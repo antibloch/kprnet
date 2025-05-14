@@ -35,6 +35,7 @@ class NPYSemanticStyle(Dataset):
     """
     def __init__(self,
                  npy_dir,
+                 npy_lab_dir,
                  split= "test",
                  W = 2048,
                  H = 64,
@@ -55,10 +56,17 @@ class NPYSemanticStyle(Dataset):
         """
         super().__init__()
         self.npy_paths = sorted(
-            [Path(npy_dir) / f for f in os.listdir(npy_dir) if f.endswith(".npy")]
+            [Path(npy_dir) / f for f in os.listdir(npy_dir) if f.endswith(".npy")], key=lambda f: int(f.split(".")[0])
         )
         if not self.npy_paths:
             raise FileNotFoundError(f"No .npy files in {npy_dir}")
+        self.npy_lab_paths = sorted(
+            [Path(npy_lab_dir) / f for f in os.listdir(npy_lab_dir) if f.endswith(".npy")], key=lambda f: int(f.split(".")[0])
+        )
+        if not self.npy_lab_paths:
+            raise FileNotFoundError(f"No .npy files in {npy_lab_dir}")
+        
+
         self.split = split
         self.use_train_aug = use_train_aug and split == "train"
         self.W = W
@@ -76,12 +84,14 @@ class NPYSemanticStyle(Dataset):
     # ---------------------------- #
     def __getitem__(self, index):
         npy_file = self.npy_paths[index]
-        pts = np.load(npy_file).astype(np.float32).reshape(-1, 4)
+        # pts = np.load(npy_file).astype(np.float32).reshape(-1, 4)
+        pts = np.load(npy_file).astype(np.float32)  # (N,4)
         points_xyz = pts[:, :3]            # (N,3)
         points_refl = pts[:, 3]            # (N,)
 
 
-        labels = np.zeros(points_xyz.shape[0], dtype=np.float32)   # dummy
+        # labels = np.zeros(points_xyz.shape[0], dtype=np.float32)   # dummy
+        labels = np.load(self.npy_lab_paths[index]).astype(np.int32)
         # projection (identical to reference)
         
 
@@ -124,8 +134,8 @@ class NPYSemanticStyle(Dataset):
 
 
         return {
-            "image": image,                  # (2,289,4097) after _transorm_test
-            "labels": labels,                # dummy, kept for API parity
+            "image": image,                  
+            "labels": labels,                
             "px": px,
             "py": py,
             "points_xyz": points_xyz,
@@ -139,6 +149,8 @@ class NPYSemanticStyle(Dataset):
 def run_inference(args):
 
     point_output_path = str(args.output_path) +"_points"
+    labels_output_path = str(args.output_path) +"_labels"
+    predictions_output_path = str(args.output_path) +"_predictions"
     if os.path.exists(args.output_path):
         shutil.rmtree(args.output_path)
 
@@ -253,27 +265,28 @@ def run_inference(args):
     out_root.mkdir(parents=True, exist_ok=True)
     with torch.no_grad():
         for batch in tqdm(dl, desc="predict"):
-            images = batch["image"].to(device)               # (1,2,289,4097)
-            px     = batch["px"].float().to(device)          # (1, N)
+            images = batch["image"].to(device)             
+            px     = batch["px"].float().to(device)          
             py     = batch["py"].float().to(device)
             pxyz   = batch["points_xyz"].float().to(device)  # (N,3) → model expects (1,N,3) – add batch dim
             # pxyz   = pxyz.unsqueeze(0)
             knns   = batch["knns"].long().to(device)
             fname  = batch["fname"][0]
+            labels = batch["labels"]
 
             print(f"py: {py.shape}")
             print(f"px: {px.shape}")
             print(f"pxyz: {pxyz.shape}")
             print(f"knns: {knns.shape}")
             print(f"images: {images.shape}")
-            # print(f"labels: {labels.shape}")
+            print(f"labels: {labels.shape}")
 
             print(f"py dtype: {py.dtype}")
             print(f"px dtype: {px.dtype}")
             print(f"pxyz dtype: {pxyz.dtype}")
             print(f"knns dtype: {knns.dtype}")
             print(f"images dtype: {images.dtype}")
-            # print(f"labels dtype: {labels.dtype}")
+            print(f"labels dtype: {labels.dtype}")
 
 
 
@@ -298,12 +311,18 @@ def run_inference(args):
 
             else:
                 points_xyz_ref = batch["points_xyz"].cpu().squeeze(0).numpy()
+                print(f"points_xyz_ref shape: {points_xyz_ref.shape}")
+                labels_ref = batch["labels"].cpu().squeeze(0).numpy()
                 predictions_points = (predictions_points.astype(np.uint32)).flatten()
                 print(f"predictions_points shape: {predictions_points.shape}")
-                out_file = os.path.join(args.output_path, f"{fname.split('.')[0]}.npy")
+                label_points  = (labels_ref.astype(np.uint32)).flatten()
+                print(f"label_points shape: {label_points.shape}")
+                out_file_labels = os.path.join(labels_output_path, f"{fname.split('.')[0]}.npy")
                 out_file_points = os.path.join(point_output_path, f"{fname.split('.')[0]}.npy")
-                np.save(out_file, predictions_points)
+                out_file_predictions = os.path.join(out_root, f"{fname.split('.')[0]}.npy")
+                np.save(out_file_predictions, predictions_points)
                 np.save(out_file_points, points_xyz_ref)
+                np.save(out_file_labels, label_points)
 
 
         # comment next line if you don’t want the visor
