@@ -56,12 +56,12 @@ class NPYSemanticStyle(Dataset):
         """
         super().__init__()
         self.npy_paths = sorted(
-            [Path(npy_dir) / f for f in os.listdir(npy_dir) if f.endswith(".npy")], key=lambda f: int(f.split(".")[0])
+            [Path(npy_dir) / f for f in os.listdir(npy_dir) if f.endswith(".npy")]
         )
         if not self.npy_paths:
             raise FileNotFoundError(f"No .npy files in {npy_dir}")
         self.npy_lab_paths = sorted(
-            [Path(npy_lab_dir) / f for f in os.listdir(npy_lab_dir) if f.endswith(".npy")], key=lambda f: int(f.split(".")[0])
+            [Path(npy_lab_dir) / f for f in os.listdir(npy_lab_dir) if f.endswith(".npy")]
         )
         if not self.npy_lab_paths:
             raise FileNotFoundError(f"No .npy files in {npy_lab_dir}")
@@ -160,6 +160,16 @@ def run_inference(args):
         shutil.rmtree(point_output_path )
 
     os.makedirs(point_output_path , exist_ok=True)
+
+    if os.path.exists(labels_output_path):
+        shutil.rmtree(labels_output_path)
+
+    os.makedirs(labels_output_path, exist_ok=True)
+
+    if os.path.exists(predictions_output_path):
+        shutil.rmtree(predictions_output_path)
+
+    os.makedirs(predictions_output_path, exist_ok=True)
 
 
     do_quick_vis = False
