@@ -37,6 +37,24 @@ python run_inference_new.py --checkpoint_path pretrained_total_model/kpr_trained
 python run_inference_new.py --checkpoint_path pretrained_total_model/kpr_trained.pth --point_folder data --output_path points_segment --W 1024 --H 64 --fov_up 44.07 --fov_down -45.73  --visualize --inverted_depth
 ```
 
+
+
+## SemanticKITT Testing
+
+```code
+python run_inference.py --semantic-kitti-dir kitti_ds/dataset/sequences --output-path pred_stuff  --checkpoint-path checkpoints/epoch10.pth
+python view_inference.py --points kitti_ds/dataset/sequences/08/velodyne --labels kitti_ds/dataset/sequences/08/labels --predictions pred_stuff/sequences/08/predictions --results results
+```
+
+
+
+## Ouster Testing
+
+```code
+python run_inference_new_labelled.py --point_folder refined_data/pc --labels_folder refined_data/label --output_path pred_stuff_ouster  --checkpoint_path checkpoints/epoch10.pth
+python view_inference_new_labelled.py --points pred_stuff_ouster_points --labels pred_stuff_ouster_labels --predictions pred_stuff_ouster_predictions --results results
+```
+
 The fully trained model weights can be downloaded [here](https://drive.google.com/file/d/11mUMdFPNT-05lC54Ru_2OwdwqTPV4jrW/view?usp=sharing) .
 
 
