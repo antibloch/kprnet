@@ -91,6 +91,7 @@ class_names = [
     "terrain",
     "pole",
     "traffic-sign",
+    "unlabeled",
 ]
 
 colors = {
@@ -303,8 +304,10 @@ def main():
 
             for label in range(num_classes):
                 pred_colors[predictions == label] = colors[label]
-                ref_colors[labels == label] = colors[label]
 
+
+            for label in range(num_classes+1):
+                ref_colors[labels == label] = colors[label]
 
             legend_patches = []
             for i, class_name in enumerate(class_names):
