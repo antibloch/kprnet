@@ -21,6 +21,7 @@ import matplotlib.pyplot as plt
 from matplotlib import cm
 import matplotlib.patches as mpatches
 import shutil
+import pandas as pd 
 
 
 parser = argparse.ArgumentParser("Run lidar bug inference")     
@@ -277,11 +278,27 @@ def main():
         shutil.rmtree(args.results)
 
     os.makedirs(args.results, exist_ok=True)
-    conf_matrix = np.zeros((num_classes, num_classes), dtype=np.uint64)
+
+
+    overall_iou =[]
+    cols = ['scan_name']
+    for i in range(num_classes):
+        cols.append(f'IoU_{class_names[i]}')
+
+    cols.append('mIoU')
+    df = pd.DataFrame(columns=cols)
+    
 
 
     for id, point_file, label_file, pred_file in zip(range(len(point_fil_names)), point_fil_names, label_file_names, pred_file_names):
         if id<len(point_fil_names):
+
+            p_file_name = point_file.split('.')[0]
+
+            conf_matrix = np.zeros((num_classes, num_classes), dtype=np.uint64)
+            classy_iou = [0] * num_classes
+
+
             point_file_path = os.path.join(args.points, point_file)
             pred_file_path = os.path.join(args.predictions, pred_file)
             label_file_path = os.path.join(args.labels, label_file)
@@ -308,12 +325,11 @@ def main():
                     conf_matrix[t, p] += 1
 
 
-
             pred_colors = np.zeros((len(predictions), 3), dtype=np.float32)
             ref_colors = np.zeros((len(labels), 3), dtype=np.float32)
 
 
-            for label in range(num_classes):
+            for label in range(num_classes+1):
                 pred_colors[predictions == label] = sup_colors[label]
 
 
@@ -329,24 +345,48 @@ def main():
 
             view_frame(points,  pred_colors, ref_colors,  legend_patches, args.results, id)
 
+            class_pixel_counts = conf_matrix.sum(axis=1)
+            total_pixel_count = class_pixel_counts.sum()
 
-    print("\n==== Per-Class IoU and mIoU ====")
-    ious = []
-    for i in range(num_classes):
-        TP = conf_matrix[i, i]
-        FP = conf_matrix[:, i].sum() - TP
-        FN = conf_matrix[i, :].sum() - TP
-        denom = TP + FP + FN
-        if denom == 0:
-            iou = float('nan')
-        else:
-            iou = TP / denom
-        ious.append(iou)
-        print(f"{class_names[i]:<15}: IoU = {iou:.4f}" if not np.isnan(iou) else f"{class_names[i]:<15}: IoU = N/A (class absent)")
+            weights = class_pixel_counts / total_pixel_count
 
-    valid_ious = [iou for iou in ious if not np.isnan(iou)]
-    mean_iou = np.mean(valid_ious)
-    print(f"\nMean IoU over {len(valid_ious)} valid classes: {mean_iou:.4f}")
+            print("\n==== Per-Class IoU and mIoU ====")
+            weighted_ious = []
+            valid_count = 0
+            wrong_count = 0
+            for i in range(num_classes):
+                TP = conf_matrix[i, i]
+                FP = conf_matrix[:, i].sum() - TP
+                FN = conf_matrix[i, :].sum() - TP
+                denom = TP + FP + FN
+                if denom == 0:
+                    iou = float('nan')
+                    print(f"{class_names[i]:<15}: IoU = N/A (class absent in prediction and ground-truth)")
+                    classy_iou[i] = 0
+
+                elif TP  == 0:
+                    iou = TP / denom
+                    wrong_count += 1
+                    print(f"{class_names[i]:<15}: IoU = {iou:.4f} (This class is predicted but not in ground-truth)")
+                    classy_iou[i] = 0
+                else:
+                    iou = TP / denom
+                    valid_count += 1
+                    weighted_ious.append(iou* weights[i])
+                    print(f"{class_names[i]:<15}: IoU = {iou:.4f}")
+                    classy_iou[i] = iou
+
+            mean_iou = sum(weighted_ious)
+            print(f"\nMean IoU over {valid_count}/{num_classes} valid classes (classes both in predictions and ground-truth): {mean_iou:.4f}")
+            
+            classy_iou.append(mean_iou)
+
+            overall_data = [f'{p_file_name}.ply'] + classy_iou
+            df = df.append(pd.Series(overall_data, index=df.columns), ignore_index=True)
+
+            
+
+    df.to_csv(os.path.join(args.results, "super_metrics.csv"), index=False)
 
     # Create a video from the saved frames
     create_video_from_frames(args.results, os.path.join(args.results, "output_video.mp4"), fps=2)
