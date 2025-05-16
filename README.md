@@ -52,7 +52,7 @@ python view_inference.py --points kitti_ds/dataset/sequences/08/velodyne --label
 
 ```code
 python run_inference_new_labelled.py --point_folder refined_data/pc --labels_folder refined_data/label --output_path pred_stuff_ouster  --checkpoint_path checkpoints/epoch10.pth
-python view_inference_new_labelled.py --points pred_stuff_ouster_points --labels pred_stuff_ouster_labels --predictions pred_stuff_ouster_predictions --results results
+python view_inference_new_labelled_allscans.py --points pred_stuff_ouster_points --labels pred_stuff_ouster_labels --predictions pred_stuff_ouster_predictions --results results
 ```
 
 The fully trained model weights can be downloaded [here](https://drive.google.com/file/d/11mUMdFPNT-05lC54Ru_2OwdwqTPV4jrW/view?usp=sharing) .
