@@ -11,14 +11,6 @@ from utils.evaluation import Eval
 import matplotlib.pyplot as plt
 import shutil
 
-def _transorm_test(depth, refl, labels, py, px):
-    depth = cv2.resize(depth, (4097, 289), interpolation=cv2.INTER_LINEAR)
-    refl = cv2.resize(refl, (4097, 289), interpolation=cv2.INTER_LINEAR)
-    py = 2 * (py / 65.0 - 0.5)
-    px = 2 * (px / 2049.0 - 0.5)
-
-    return depth, refl, labels, py, px
-
 
 
 # (If you already pasted those helpers in your file, just import them.)
@@ -147,6 +139,15 @@ class NPYSemanticStyle(Dataset):
 # ------------------------------------------------------------
 
 def run_inference(args):
+
+    def _transorm_test(depth, refl, labels, py, px):
+        depth = cv2.resize(depth, (4097, 289), interpolation=cv2.INTER_LINEAR)
+        refl = cv2.resize(refl, (4097, 289), interpolation=cv2.INTER_LINEAR)
+        py = 2 * (py / (float(args.H +1)) - 0.5)
+        px = 2 * (px / (float(args.W + 1)) - 0.5)
+    
+        return depth, refl, labels, py, px
+
 
     point_output_path = str(args.output_path) +"_points"
     labels_output_path = str(args.output_path) +"_labels"
