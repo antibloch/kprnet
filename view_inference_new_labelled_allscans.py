@@ -288,7 +288,8 @@ def main():
     cols.append('mIoU')
     df = pd.DataFrame(columns=cols)
     
-
+    dense_class_ious = []
+    sparse_class_ious = []
 
     for id, point_file, label_file, pred_file in zip(range(len(point_fil_names)), point_fil_names, label_file_names, pred_file_names):
         if id<len(point_fil_names):
@@ -376,17 +377,46 @@ def main():
                     print(f"{class_names[i]:<15}: IoU = {iou:.4f}")
                     classy_iou[i] = iou
 
+            mask_classy_iou = (np.array(classy_iou) != 0.0)
+
             mean_iou = sum(weighted_ious)
+
+            if np.sum(mask_classy_iou)==1:
+                sparse_class_ious.append(mean_iou)
+            else:
+                dense_class_ious.append(mean_iou)
+
+
             print(f"\nMean IoU over {valid_count}/{num_classes} valid classes (classes both in predictions and ground-truth): {mean_iou:.4f}")
             
             classy_iou.append(mean_iou)
-
             overall_data = [f'{p_file_name}.ply'] + classy_iou
             df = df.append(pd.Series(overall_data, index=df.columns), ignore_index=True)
 
             
 
     df.to_csv(os.path.join(args.results, "super_metrics.csv"), index=False)
+    df_np = df.to_numpy()
+    per_classes_ious = []
+    for i in range(1, num_classes+1):
+        per_class_iou = df_np[:, i]
+        mask_iou = per_class_iou != 0
+        per_class_iou = per_class_iou[mask_iou]
+        mean_iou = np.mean(per_class_iou)
+        per_classes_ious.append(mean_iou)
+    per_classes_ious = np.array(per_classes_ious)
+    dense_mean_iou = np.mean(dense_class_ious)
+    sparse_mean_iou = np.mean(sparse_class_ious)
+    print("-------------------------------------------")
+    print("===========Mean Scores=====================")
+    for i in range(num_classes):
+        print(f"Class {class_names[i]}: {per_classes_ious[i]:.4f}" if str(per_classes_ious[i]) != 'nan' else f"Class {class_names[i]}: N/A")
+    print("-------------------------------------------")
+    print(f"Mean IoU over fully annotated: {dense_mean_iou:.4f}")
+    print(f"Mean IoU over partially annotated: {sparse_mean_iou:.4f}")
+    print("===========================================")
+    print("-------------------------------------------")
+
 
     # Create a video from the saved frames
     create_video_from_frames(args.results, os.path.join(args.results, "output_video.mp4"), fps=2)
