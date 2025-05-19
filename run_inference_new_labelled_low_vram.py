@@ -335,6 +335,10 @@ def run_inference(args):
                 np.save(out_file_points, points_xyz_ref)
                 np.save(out_file_labels, label_points)
 
+            # === Free GPU memory explicitly ===
+            del images, px, py, pxyz, knns, predictions, predictions_argmax
+            torch.cuda.empty_cache()
+
 
         # comment next line if you don’t want the visor
         # o3d.visualization.draw_geometries([pcd])
