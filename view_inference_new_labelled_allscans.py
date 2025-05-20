@@ -363,13 +363,13 @@ def main():
                 if denom == 0:
                     iou = float('nan')
                     print(f"{class_names[i]:<15}: IoU = N/A (class absent in prediction and ground-truth)")
-                    classy_iou[i] = 0
+                    classy_iou[i] = 0.0
 
                 elif TP  == 0:
                     iou = TP / denom
                     wrong_count += 1
                     print(f"{class_names[i]:<15}: IoU = {iou:.4f} (This class is predicted but not in ground-truth)")
-                    classy_iou[i] = 0
+                    classy_iou[i] = 0.0
                 else:
                     iou = TP / denom
                     valid_count += 1
